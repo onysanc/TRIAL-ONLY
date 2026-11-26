@@ -186,7 +186,19 @@
   tr.pdet>td{border:none}
   tr.pdet table th,tr.pdet table td{border:1px solid var(--line)}
   /* validation stage */
-  .vtime{font:700 20px ui-monospace,monospace}
+  .vtime{font:700 15px ui-monospace,monospace;white-space:nowrap}
+  /* compact active / validation cards */
+  #active.cards,#valq.cards{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px}
+  .pick{padding:6px 8px;gap:4px;border-left-width:3px}
+  .pick .ph{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;min-width:0}
+  .pick .ph .num{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;text-align:right}
+  .pick .pm{display:flex;gap:8px;align-items:center;justify-content:space-between}
+  .pick .pm>div{min-width:0}
+  .pick .note{font-size:10.5px;line-height:1.25;margin:0}
+  .pick .bar{height:4px}
+  .pick button{padding:3px 8px;font-size:11px;min-height:0}
+  .pick .vin{padding:2px 4px;font-size:11px;min-height:0;flex:1;min-width:0}
+  .pick .row{gap:6px;flex-wrap:nowrap}
   .vin{width:100%}
 </style>
 </head>
@@ -1060,14 +1072,11 @@ function renderActive(){
     const mins = Math.round((te-now)/60000), late = mins < 0;
     const pct = Math.max(0, Math.min(100, (now-st)/Math.max(1,te-st)*100));
     const col = DEST_COL[e.dest] || 'var(--acc)';
-    return `<div class="pick ${late?'late':''}" style="--c:${col}">
-      <div class="row" style="justify-content:space-between;align-items:center">${destTag(e.dest)}<span class="tag ${e.type==='STO'?'sto':''}">${e.type}</span></div>
-      <div class="num" style="text-align:left;font-size:13px">${esc(e.ref || e.shipment_no)}</div>
-      <div class="note">${esc(e.picker)} · ${fmt(e.qty)} qty · ${fmt(e.final_min)} min / ${fh(e.final_min)} hrs · target end ${fmtDT(e.target_end)}</div>
-      <div style="font:700 20px ui-monospace,monospace;color:${late?'var(--rose)':'var(--acc)'}">${hm(Math.abs(mins))} ${late?'overdue':'left'}</div>
-      <div class="note">${Math.abs(mins)} min · ${fh(Math.abs(mins))} hrs ${late?'overdue':'left'}</div>
+    return `<div class="pick ${late?'late':''}" style="--c:${col}" title="${Math.abs(mins)} min · ${fh(Math.abs(mins))} hrs ${late?'overdue':'left'}">
+      <div class="ph">${destTag(e.dest)}<span class="tag ${e.type==='STO'?'sto':''}">${e.type}</span><span class="num">${esc(e.ref || e.shipment_no)}</span></div>
+      <div class="note">${esc(e.picker)} · ${fmt(e.qty)} qty · ${fmt(e.final_min)} min · end ${fmtDT(e.target_end)}</div>
+      <div class="pm"><span class="vtime" style="color:${late?'var(--rose)':'var(--acc)'}">${hm(Math.abs(mins))} ${late?'overdue':'left'}</span><button class="ok" onclick="finishNow('${e.id}')">✔ Finish</button></div>
       <div class="bar"><i style="width:${pct}%"></i></div>
-      <div class="row"><button class="ok" onclick="finishNow('${e.id}')">✔ Finish now</button></div>
     </div>`;
   }).join('') : '<div class="note card" style="grid-column:1/-1;text-align:center">No open pickings — tap ＋ New entry to start one.</div>';
 }
@@ -1219,24 +1228,20 @@ function renderValidation(){
   document.getElementById('v-badge').textContent = list.length ? `${list.length-run} waiting · ${run} validating` : '';
   document.getElementById('valq').innerHTML = list.length ? list.map(e=>{
     const col = DEST_COL[e.dest] || 'var(--acc)';
-    const head = `<div class="row" style="justify-content:space-between;align-items:center">${destTag(e.dest)}<span class="tag ${e.type==='STO'?'sto':''}">${e.type}</span></div>
-      <div class="num" style="text-align:left;font-size:13px">${esc(e.ref || e.shipment_no)}</div>`;
+    const head = `<div class="ph">${destTag(e.dest)}<span class="tag ${e.type==='STO'?'sto':''}">${e.type}</span><span class="num">${esc(e.ref || e.shipment_no)}</span></div>`;
     if (e.val_start){
       const s = new Date(e.val_start), m = Math.max(0, (now-s)/60000 - breakOverlapMinutes(s, now));
       return `<div class="pick" style="--c:var(--ok)">${head}
-        <div class="note">Picked by ${esc(e.picker)} · ${fmt(e.qty)} qty · validator <b>${esc(e.val_by)}</b> · started ${fmtDT(e.val_start)}</div>
-        <div class="vtime" style="color:${m > valTargetOf(e) ? 'var(--rose)' : 'var(--ok)'}">${hm(m)} validating</div>
-        <div class="note">Target ${f1(valTargetOf(e))} min · ${m > valTargetOf(e) ? hm(m - valTargetOf(e)) + ' over target' : hm(valTargetOf(e) - m) + ' left'}</div>
-        <div class="row"><button class="ok" onclick="endValidation('${e.id}')">■ END VALIDATION</button><button onclick="undoValidationStart('${e.id}')">Undo start</button></div>
+        <div class="note">${esc(e.picker)} · ${fmt(e.qty)} qty · validator <b>${esc(e.val_by)}</b> · since ${fmtDT(e.val_start)}</div>
+        <div class="pm"><div><span class="vtime" style="color:${m > valTargetOf(e) ? 'var(--rose)' : 'var(--ok)'}">${hm(m)} validating</span><div class="note">Target ${f1(valTargetOf(e))} min · ${m > valTargetOf(e) ? hm(m - valTargetOf(e)) + ' over' : hm(valTargetOf(e) - m) + ' left'}</div></div>
+          <div class="row"><button class="ok" onclick="endValidation('${e.id}')">■ END</button><button onclick="undoValidationStart('${e.id}')">Undo</button></div></div>
       </div>`;
     }
     const w = Math.max(0, (now - new Date(e.end))/60000);
     return `<div class="pick" style="--c:${col}">${head}
-      <div class="note">Picked by ${esc(e.picker)} · ${fmt(e.qty)} qty · picking ended ${fmtDT(e.end)}</div>
-      <div class="vtime" style="color:var(--amber)">${hm(w)} waiting</div>
-      <div class="note">Validation target ${f1(valTargetFor(e.lines))} min</div>
-      <div><label>Validator (from 👷 Pickers list)</label><select class="vin" onchange="valInput('${e.id}',this.value)"><option value="">— Select validator —</option>${roster.filter(n=>!shipPickers(e).has(n.toLowerCase())).map(n=>`<option value="${esc(n)}" ${n===e.val_by?'selected':''}>${esc(n)}</option>`).join('')}</select></div>
-      <div class="row"><button class="pri" onclick="startValidation('${e.id}')">▶ START VALIDATION</button></div>
+      <div class="note">${esc(e.picker)} · ${fmt(e.qty)} qty · ended ${fmtDT(e.end)}</div>
+      <div class="pm"><span class="vtime" style="color:var(--amber)" title="Validation target ${f1(valTargetFor(e.lines))} min">${hm(w)} waiting</span><span class="note">Target ${f1(valTargetFor(e.lines))} min</span></div>
+      <div class="row"><select class="vin" aria-label="Validator" onchange="valInput('${e.id}',this.value)"><option value="">— Validator —</option>${roster.filter(n=>!shipPickers(e).has(n.toLowerCase())).map(n=>`<option value="${esc(n)}" ${n===e.val_by?'selected':''}>${esc(n)}</option>`).join('')}</select><button class="pri" onclick="startValidation('${e.id}')">▶ START</button></div>
     </div>`;
   }).join('') : '<div class="note card" style="grid-column:1/-1;text-align:center">Nothing waiting for validation — finished pickings appear here.</div>';
 }
