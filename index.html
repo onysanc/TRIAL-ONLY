@@ -151,6 +151,25 @@
   .qrem{font-size:11px;white-space:nowrap}
   
 
+  /* compact tables */
+  table{font-size:11.5px}
+  th{padding:6px 5px;font-size:11px}
+  td{padding:5px 5px}
+  .scroll table th{white-space:normal;line-height:1.15;vertical-align:bottom}
+  .scroll table td{line-height:1.25}
+  .scroll table .tag{font-size:9.5px;padding:0 6px}
+  .scroll table button{padding:3px 8px;font-size:11px}
+  .qpk{min-width:430px}
+  .qpk-in{grid-template-columns:repeat(5,minmax(80px,1fr));gap:3px}
+  .qpk-in input{padding:3px 5px;font-size:11px}
+  .qsub{font-size:11px}
+  /* log: compact columns (hides the duplicated / derived ones; Full shows everything) */
+  #logScroll.compact table th:nth-child(1),#logScroll.compact table td:nth-child(1),
+  #logScroll.compact table th:nth-child(5),#logScroll.compact table td:nth-child(5),
+  #logScroll.compact table th:nth-child(10),#logScroll.compact table td:nth-child(10),
+  #logScroll.compact table th:nth-child(14),#logScroll.compact table td:nth-child(14),
+  #logScroll.compact table th:nth-child(18),#logScroll.compact table td:nth-child(18),
+  #logScroll.compact table th:nth-child(19),#logScroll.compact table td:nth-child(19){display:none}
   /* gridlines for better visuals */
   .scroll table{border:1px solid var(--line)}
   .scroll table th,.scroll table td{border:1px solid var(--line)}
@@ -317,12 +336,13 @@
       </select>
       <input type="hidden" id="filter-dest" value="">
       <div class="chips" id="dchips" style="flex-basis:100%;justify-content:flex-end"></div>
+      <button id="colBtn" onclick="toggleCols()" title="Show fewer or all columns in the log">Columns: Compact</button>
       <button onclick="guard(exportJSON)" title="Password required">🔒 ⬇ Backup</button>
       <button onclick="guard(()=>document.getElementById('imp').click())">🔒 ⬆ Import</button>
       <input type="file" id="imp" accept=".csv,.json,text/csv,application/json" style="display:none" onchange="importFile(this)">
       <button class="x" onclick="askClear()">🔒 Clear all</button>
     </div>
-    <div class="scroll">
+    <div class="scroll" id="logScroll">
       <table>
         <thead><tr>
           <th>Logged</th><th>Type</th><th>Shipment</th><th>Destination</th><th>Reference</th><th>SO / DR / Truck / Qty</th><th>Picker</th>
@@ -1059,6 +1079,12 @@ function renderLogFilters(){
     c(logStatus==='pending',"setLogStatus('pending')",'Pending',n(e=>!e.end)) +
     c(logStatus==='val',"setLogStatus('val')",'For validation',n(needsVal));
 }
+let logCompact = (()=>{ try { return localStorage.getItem('pick_cols_v1') !== 'full'; } catch(e){ return true; } })();
+function applyCols(){
+  const el = document.getElementById('logScroll'); if (el) el.classList.toggle('compact', logCompact);
+  const b = document.getElementById('colBtn'); if (b) b.textContent = 'Columns: ' + (logCompact ? 'Compact' : 'Full');
+}
+function toggleCols(){ logCompact = !logCompact; try { localStorage.setItem('pick_cols_v1', logCompact ? 'compact' : 'full'); } catch(e){} applyCols(); }
 function setDest(v){ document.getElementById('filter-dest').value = v; renderLog(); }
 function finishNow(id){
   const e = entries.find(x=>x.id===id); if (!e) return;
@@ -1742,6 +1768,7 @@ document.addEventListener('visibilitychange', ()=>{ syncNow(); });
 window.addEventListener('pagehide', ()=>{ syncNow(); });
 window.addEventListener('online', ()=>syncNow());
 
+applyCols();
 document.getElementById('f-start').addEventListener('input', preview);
 document.getElementById('f-start').value = toLocalInput(new Date());
 applyTheme((()=>{ try { return localStorage.getItem('pick_theme_v1'); } catch(e){ return null; } })() || 'belize');
