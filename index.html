@@ -394,6 +394,8 @@
     </div>
     <p class="note" id="sb-msg" style="min-height:16px;margin:8px 0"></p>
     <div class="row"><button class="pri" onclick="saveCloud()">Save &amp; sync</button><button onclick="syncNow(true)">Sync now</button><button onclick="resyncAll()" title="Forget the sync position and download everything again (unsynced local changes are still sent)">Full re-sync</button><button class="x" onclick="disconnectCloud()">Disconnect</button></div>
+    <div class="row" style="margin-top:10px"><button class="ok" onclick="migrateLocal()" title="Send every record stored in this browser (log, pending queue, pickers, breaks, rates, settings) to the Supabase tables and verify the result">⬆ Upload ALL local data to Supabase tables</button></div>
+    <p class="note" style="margin-top:6px">Use this once per device that already holds records. It writes the log, pending queue, picker roster, break windows, target rates and settings from this browser into the cloud tables, then checks the counts.</p>
     <p class="note" style="margin-top:10px">Once connected, every device with the same URL, key and access code shares the same log, pending queue, pickers, breaks and rates. Changes are sent a moment after you make them and other devices pick them up within ~15 seconds. If the connection drops, the app keeps working from this browser and catches up automatically.</p>
   </div>
 </dialog>
@@ -1446,6 +1448,7 @@ const SB_DEFAULT = {url:'https://qmmoifmkqrmusvbsnivb.supabase.co', key:'sb_publ
 const KEY_SB = 'pick_sb_cfg_v1', KEY_SNAP = 'pick_sync_snap_v1', SYNC_EVERY = 15000, OVERLAP = 10000, CHUNK = 150;
 let sbCfg = Object.assign({url:SB_DEFAULT.url, key:SB_DEFAULT.key, code:''}, load(KEY_SB, null) || {});
 let snap = Object.assign({cursor:null, entries:{}, queue:{}, config:{}}, load(KEY_SNAP, null) || {});
+let forceCfg = false;   // true during "Upload ALL local data": also push default-valued config
 let syncBusy = false, syncAgain = false, syncPaused = false, pushTimer = null, needRender = false, syncSt = {ok:null, msg:'', at:null};
 const sbOn = () => !!(sbCfg.url && sbCfg.key && sbCfg.code);
 const canon = o => JSON.stringify(o, (k, v) => (v && typeof v === 'object' && !Array.isArray(v)) ? Object.keys(v).sort().reduce((a, x) => (a[x] = v[x], a), {}) : v);
@@ -1498,7 +1501,7 @@ function cfgDiff(){
   Object.keys(c).forEach(k=>{
     const g = sig(c[k]);
     if (snap.config[k] === g) return;
-    if (snap.config[k] === undefined && isDefaultCfg(k, c[k])) return;   // never push untouched defaults over a configured server
+    if (snap.config[k] === undefined && isDefaultCfg(k, c[k]) && !forceCfg) return;   // never push untouched defaults over a configured server
     out.push({key:k, data:c[k], g});
   });
   return out;
@@ -1594,6 +1597,30 @@ async function saveCloud(){
   sbCfg = {url, key, code}; saveCfg(); saveSnap(); syncPaused = false;
   msg.textContent = 'Connecting…'; renderSyncBtn();
   await syncNow(true);
+}
+/* one-click migration: browser (localStorage) -> Supabase tables, then verify against the server */
+async function migrateLocal(){
+  const msg = document.getElementById('sb-msg');
+  if (!sbOn()){ msg.textContent = 'Fill in URL, key and access code and press Save & sync first.'; return; }
+  if (!confirm(`Upload everything stored in this browser to the cloud tables?\n\n${entries.length} picking(s), ${queue.length} pending, ${roster.length} picker(s), ${breaks.length} break(s) + rates/settings.\n\nRecords already in the cloud are kept; if the same record exists on both sides the cloud copy is used.`)) return;
+  msg.textContent = 'Uploading…';
+  while (syncBusy) await new Promise(r => setTimeout(r, 300));
+  snap = {cursor:null, entries:{}, queue:{}, config:{}}; saveSnap(); syncPaused = false; forceCfg = true;
+  try { await syncNow(true); } finally { forceCfg = false; }
+  if (syncSt.ok !== true){ msg.textContent = 'Upload did not finish: ' + (syncSt.msg || 'unknown error') + '. Nothing is lost — fix the problem and press the button again.'; return; }
+  try {
+    const res = await sbRpc('wops_pick_pull', {p_code:sbCfg.code, p_since:null});
+    const se = new Set((res.entries || []).map(r => r.id)), sq = new Set((res.queue || []).map(r => r.id));
+    const missE = entries.filter(e => !se.has(e.id)).length, missQ = queue.filter(q => !sq.has(q.id)).length;
+    const keys = (res.config || []).map(c => c.key);
+    const missC = ['roster','breaks','settings'].filter(k => !keys.includes(k));
+    const ok = !missE && !missQ && !missC.length;
+    msg.textContent = (ok ? '✔ Verified. ' : '⚠ Check needed. ') +
+      `Cloud now holds ${se.size} picking(s), ${sq.size} pending, config: ${keys.join(', ') || 'none'}. This browser: ${entries.length} picking(s), ${queue.length} pending.` +
+      (missE || missQ || missC.length ? ` Missing in cloud: ${missE} picking(s), ${missQ} pending${missC.length ? ', config ' + missC.join(', ') : ''} — press the button again.` : '');
+  } catch(e){
+    msg.textContent = 'Uploaded, but the verification read failed: ' + String((e && e.message) || e).slice(0, 80);
+  }
 }
 function resyncAll(){
   if (!sbOn()) return;
