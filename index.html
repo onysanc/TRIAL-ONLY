@@ -163,13 +163,17 @@
   .qpk-in{grid-template-columns:repeat(5,minmax(80px,1fr));gap:3px}
   .qpk-in input{padding:3px 5px;font-size:11px}
   .qsub{font-size:11px}
-  /* log: compact columns (hides the duplicated / derived ones; Full shows everything) */
-  #logScroll.compact table th:nth-child(1),#logScroll.compact table td:nth-child(1),
-  #logScroll.compact table th:nth-child(5),#logScroll.compact table td:nth-child(5),
-  #logScroll.compact table th:nth-child(10),#logScroll.compact table td:nth-child(10),
-  #logScroll.compact table th:nth-child(14),#logScroll.compact table td:nth-child(14),
-  #logScroll.compact table th:nth-child(18),#logScroll.compact table td:nth-child(18),
-  #logScroll.compact table th:nth-child(19),#logScroll.compact table td:nth-child(19){display:none}
+  /* column chooser */
+  .colmenu{position:relative;display:inline-block}
+  .colmenu>summary{cursor:pointer;list-style:none;border:1px solid var(--inline);border-radius:4px;padding:7px 12px;background:var(--btn);color:var(--acc);font-weight:600;font-size:13px;user-select:none}
+  .colmenu>summary::-webkit-details-marker{display:none}
+  .colmenu[open]>summary{background:var(--btnh)}
+  .colpop{position:absolute;right:0;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:10px;min-width:240px;max-height:60vh;overflow:auto;box-shadow:0 6px 18px rgba(0,0,0,.28);text-align:left}
+  .colmenu.left .colpop{right:auto;left:0}
+  .colpop label{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text);margin:4px 0;cursor:pointer}
+  .colpop input{width:auto;min-height:0}
+  .colpop .row{margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+  .foldbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   /* gridlines for better visuals */
   .scroll table{border:1px solid var(--line)}
   .scroll table th,.scroll table td{border:1px solid var(--line)}
@@ -191,6 +195,7 @@
     <h1>WOPS - WAREHOUSE OPERATIONS</h1>
     <div class="row" style="align-items:center"><button class="big csv" onclick="guard(exportCSV)" title="Password required">🔒 ⬇ Export CSV</button><button class="big csv" onclick="guard(()=>document.getElementById('imp').click())" title="Load a previous log (CSV from Export CSV, or JSON backup)">🔒 ⬆ Import</button><button class="big csv" id="cloudBtn" onclick="guard(openCloud)" title="Supabase cloud sync (always on)">☁ Connecting…</button><select id="themeSel" onchange="applyTheme(this.value)" aria-label="Theme" title="Theme"><option value="belize">Belize</option><option value="deep">Belize Deep</option><option value="hcb">High Contrast Black</option><option value="hcw">High Contrast White</option></select><button class="pri big" onclick="openEntry()">＋ New entry</button></div>
   </div>
+  <div class="foldbar"><button onclick="foldAll(false)" title="Fold Active pickings, Validation and Pending ahead">▸ Fold all sections</button><button onclick="foldAll(true)">▾ Unfold all</button><span class="note">Folded sections still show their counts. Your choice is remembered.</span></div>
   <p class="note" style="margin:0">Records are saved in this browser (localStorage). Use Export to keep a copy — clearing browser data will erase the log. Use ⬆ Import to load a previous log (CSV from Export CSV, or a JSON backup).</p>
 
   <div class="kpis" id="strip">
@@ -201,9 +206,9 @@
     <div class="kpi"><span>Avg speed %</span><b style="color:var(--blue)" id="t-speed">—</b></div>
   </div>
 
-  <section><h2>Active pickings</h2><div class="cards" id="active"></div></section>
+  <details class="card" id="actCard" open><summary><h2>Active pickings</h2><span class="badge" id="a-badge"></span></summary><div class="cards" id="active"></div></details>
 
-  <section><h2>Validation <span class="badge" id="v-badge"></span></h2><div class="cards" id="valq"></div></section>
+  <details class="card" id="valCard" open><summary><h2>Validation</h2><span class="badge" id="v-badge"></span></summary><div class="cards" id="valq"></div></details>
 
   <details class="card" id="qCard" open>
     <summary><h2>Pending ahead</h2><span class="badge" id="q-badge"></span></summary>
@@ -211,6 +216,7 @@
       <button class="pri" onclick="openQPaste()">📋 Paste from Excel</button>
       <button onclick="openEntry()">＋ Add one</button>
       <button class="x" onclick="clearQueue()">Clear queue</button>
+      <span id="colmenu-queue"></span>
       <div class="qbulk">
         <div><label>Assign to selected</label><input id="q-bulk" list="pickerList" placeholder="Up to 5 pickers, comma-separated" autocomplete="off" style="width:300px"></div>
         <button onclick="bulkAssign(false)">Assign</button>
@@ -218,7 +224,7 @@
       </div>
     </div>
     <datalist id="pickerList"></datalist>
-    <div class="scroll" style="max-height:46vh">
+    <div class="scroll" id="queueScroll" style="max-height:46vh">
       <table>
         <thead><tr>
           <th><input type="checkbox" class="qchk" id="q-all" onchange="qToggleAll(this.checked)" aria-label="Select all"></th>
@@ -289,11 +295,11 @@
           <select id="p-sort" onchange="renderPerf()" style="width:150px">
             <option value="overall">Overall performance</option><option value="speed">Speed</option><option value="prod">Productivity</option><option value="qty">Total qty</option>
           </select></div>
-        <button class="csv" onclick="guard(exportPerfCSV)" title="Password required">🔒 ⬇ Export CSV</button>
+        <span id="colmenu-perf"></span><button class="csv" onclick="guard(exportPerfCSV)" title="Password required">🔒 ⬇ Export CSV</button>
       </div>
     </div>
     <div class="kpis" id="perf-kpis"></div>
-    <div class="scroll" style="margin-top:12px">
+    <div class="scroll" id="perfScroll" style="margin-top:12px">
       <table>
         <thead><tr>
           <th>Rank</th><th>Picker / Manpower</th><th class="num">Pickings</th><th class="num">Days</th><th class="num">Qty</th>
@@ -336,7 +342,7 @@
       </select>
       <input type="hidden" id="filter-dest" value="">
       <div class="chips" id="dchips" style="flex-basis:100%;justify-content:flex-end"></div>
-      <button id="colBtn" onclick="toggleCols()" title="Show fewer or all columns in the log">Columns: Compact</button>
+      <span id="colmenu-log"></span>
       <button onclick="guard(exportJSON)" title="Password required">🔒 ⬇ Backup</button>
       <button onclick="guard(()=>document.getElementById('imp').click())">🔒 ⬆ Import</button>
       <input type="file" id="imp" accept=".csv,.json,text/csv,application/json" style="display:none" onchange="importFile(this)">
@@ -1034,6 +1040,7 @@ function renderStrip(){
 }
 function renderActive(){
   const now = Date.now(), open = openEntries();
+  { const late = open.filter(e=>now > new Date(e.target_end)).length; document.getElementById('a-badge').textContent = open.length ? `${open.length} open${late ? ' · ' + late + ' overdue' : ''}` : 'none'; }
   document.getElementById('active').innerHTML = open.length ? open.map(e=>{
     const st = new Date(e.start).getTime(), te = new Date(e.target_end).getTime();
     const mins = Math.round((te-now)/60000), late = mins < 0;
@@ -1079,12 +1086,66 @@ function renderLogFilters(){
     c(logStatus==='pending',"setLogStatus('pending')",'Pending',n(e=>!e.end)) +
     c(logStatus==='val',"setLogStatus('val')",'For validation',n(needsVal));
 }
-let logCompact = (()=>{ try { return localStorage.getItem('pick_cols_v1') !== 'full'; } catch(e){ return true; } })();
-function applyCols(){
-  const el = document.getElementById('logScroll'); if (el) el.classList.toggle('compact', logCompact);
-  const b = document.getElementById('colBtn'); if (b) b.textContent = 'Columns: ' + (logCompact ? 'Compact' : 'Full');
+/* ---------- COLUMN CHOOSER (hide / show table columns, remembered per table) ---------- */
+const COLTABLES = [
+  {id:'logScroll',   key:'pick_hide_log_v1',   def:[1,5,10,14,18,19], mount:'colmenu-log',   side:''},
+  {id:'queueScroll', key:'pick_hide_queue_v1', def:[],                mount:'colmenu-queue', side:'left'},
+  {id:'perfScroll',  key:'pick_hide_perf_v1',  def:[],                mount:'colmenu-perf',  side:''}
+];
+const colHidden = {};
+function colHeads(t){
+  return [...document.querySelectorAll('#'+t.id+' > table > thead > tr > th')].map((th,i,all)=>{
+    const txt = th.textContent.replace(/\s+/g,' ').trim();
+    return {i:i+1, label: txt || (i===0 ? 'Select' : null)};   // a blank last header is the action buttons: always shown
+  }).filter(h=>h.label);
 }
-function toggleCols(){ logCompact = !logCompact; try { localStorage.setItem('pick_cols_v1', logCompact ? 'compact' : 'full'); } catch(e){} applyCols(); }
+function colApply(){
+  const css = COLTABLES.map(t=>[...colHidden[t.id]].map(i=>`#${t.id} > table > thead > tr > th:nth-child(${i}),#${t.id} > table > tbody > tr > td:not([colspan]):nth-child(${i})`).join(',')).filter(Boolean).map(sel=>sel+'{display:none}').join('\n');
+  document.getElementById('colStyle').textContent = css;
+}
+function colSave(t){ try { localStorage.setItem(t.key, JSON.stringify([...colHidden[t.id]])); } catch(e){} }
+function colToggle(id, i, show){
+  const t = COLTABLES.find(x=>x.id===id); show ? colHidden[id].delete(i) : colHidden[id].add(i);
+  colSave(t); colApply(); colLabel(t);
+}
+function colPreset(id, mode){
+  const t = COLTABLES.find(x=>x.id===id);
+  colHidden[id] = new Set(mode === 'all' ? [] : t.def);
+  colSave(t); colApply(); colBuild(t);
+}
+function colLabel(t){
+  const n = colHeads(t).length, h = colHidden[t.id].size, el = document.querySelector('#'+t.mount+' summary');
+  if (el) el.textContent = h ? `Columns (${h} hidden) ▾` : 'Columns ▾';
+}
+function colBuild(t){
+  const m = document.getElementById(t.mount); if (!m) return;
+  const open = m.querySelector('details') && m.querySelector('details').open;
+  m.innerHTML = `<details class="colmenu ${t.side}"${open?' open':''}><summary></summary><div class="colpop">` +
+    colHeads(t).map(h=>`<label><input type="checkbox" ${colHidden[t.id].has(h.i)?'':'checked'} onchange="colToggle('${t.id}',${h.i},this.checked)"> ${esc(h.label)}</label>`).join('') +
+    `<div class="row">${t.def.length ? `<button onclick="colPreset('${t.id}','compact')">Compact</button>` : ''}<button onclick="colPreset('${t.id}','all')">Show all</button></div></div></details>`;
+  colLabel(t);
+}
+function colInit(){
+  if (!document.getElementById('colStyle')){ const st = document.createElement('style'); st.id = 'colStyle'; document.head.appendChild(st); }
+  COLTABLES.forEach(t=>{
+    let saved = null; try { saved = JSON.parse(localStorage.getItem(t.key)); } catch(e){}
+    colHidden[t.id] = new Set(Array.isArray(saved) ? saved : t.def);
+    colBuild(t);
+  });
+  colApply();
+  document.addEventListener('click', ev=>{ document.querySelectorAll('details.colmenu[open]').forEach(d=>{ if (!d.contains(ev.target)) d.open = false; }); });
+}
+/* ---------- FOLDABLE SECTIONS ---------- */
+const FOLDS = ['actCard','valCard','qCard'];
+function foldInit(){
+  FOLDS.forEach(id=>{
+    const d = document.getElementById(id); if (!d) return;
+    let v = null; try { v = localStorage.getItem('pick_fold_'+id); } catch(e){}
+    if (v === '0') d.open = false; else if (v === '1') d.open = true;
+    d.addEventListener('toggle', ()=>{ try { localStorage.setItem('pick_fold_'+id, d.open ? '1' : '0'); } catch(e){} });
+  });
+}
+function foldAll(open){ FOLDS.forEach(id=>{ const d = document.getElementById(id); if (d) d.open = open; }); }
 function setDest(v){ document.getElementById('filter-dest').value = v; renderLog(); }
 function finishNow(id){
   const e = entries.find(x=>x.id===id); if (!e) return;
@@ -1768,7 +1829,7 @@ document.addEventListener('visibilitychange', ()=>{ syncNow(); });
 window.addEventListener('pagehide', ()=>{ syncNow(); });
 window.addEventListener('online', ()=>syncNow());
 
-applyCols();
+colInit(); foldInit();
 document.getElementById('f-start').addEventListener('input', preview);
 document.getElementById('f-start').value = toLocalInput(new Date());
 applyTheme((()=>{ try { return localStorage.getItem('pick_theme_v1'); } catch(e){ return null; } })() || 'belize');
