@@ -128,16 +128,16 @@
   /* pending-ahead queue */
   .qchk{width:18px;height:18px;min-height:0 !important;padding:0;accent-color:var(--acc)}
   .qrow.sel{background:var(--hover)}
-  .qpick{min-width:140px}
+  .qpick{min-width:0}
   .qbar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}
   .qbar>button{min-height:36px}
   .qbulk{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-left:auto;padding:8px 10px;background:var(--in);border:1px solid var(--line);border-radius:4px}
   .qsub{display:block;white-space:nowrap}
   #qText{width:100%;min-height:200px;background:var(--in);color:var(--text);border:1px solid var(--inline);border-radius:4px;padding:8px;font:12px/1.5 ui-monospace,monospace;resize:vertical}
   #qDlg{max-width:760px}
-  .qpk{min-width:300px;max-width:400px;margin:0 auto;text-align:left;display:grid;gap:8px}
-  .qpk-in{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-  .qpk-in input{padding:5px 8px;font-size:13px}
+  .qpk{min-width:620px;margin:0 auto;text-align:left;display:grid;gap:4px}
+  .qpk-in{display:grid;grid-template-columns:repeat(5,minmax(118px,1fr));gap:4px}
+  .qpk-in input{padding:4px 6px;font-size:12px;min-height:0}
   .qsplit{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .qsplit-body{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
   .seg{display:inline-flex;border:1px solid var(--inline);border-radius:4px;overflow:hidden}
@@ -149,8 +149,18 @@
   .qshare{display:inline-flex;gap:6px;align-items:center;font-size:11px;color:var(--mute);margin:0;white-space:nowrap}
   .qshare input{width:88px;padding:3px 6px;font-size:12px}
   .qrem{font-size:11px;white-space:nowrap}
-  @media(max-width:600px){.qpk{min-width:0}.qpk-in{grid-template-columns:1fr}}
+  
 
+  /* gridlines for better visuals */
+  .scroll table{border:1px solid var(--line)}
+  .scroll table th,.scroll table td{border:1px solid var(--line)}
+  .scroll table thead th{border-bottom:2px solid var(--inline)}
+  .scroll table tbody tr:nth-child(even){background:color-mix(in srgb,var(--thbg) 55%,transparent)}
+  .scroll table tbody tr:hover{background:var(--hover)}
+  tr.qrow>td{padding:5px 6px}
+  tr.qrow.sel{background:var(--hover) !important}
+  tr.pdet>td{border:none}
+  tr.pdet table th,tr.pdet table td{border:1px solid var(--line)}
   /* validation stage */
   .vtime{font:700 20px ui-monospace,monospace}
   .vin{width:100%}
@@ -673,7 +683,7 @@ function qSplit(q, n){
   return out;
 }
 const QPK = ['picker','picker2','picker3','picker4','picker5'], QMAX = 5;
-const QPK_LABEL = ['Picker 1','2nd picker (optional)','3rd picker (optional)','4th picker (optional)','5th picker (optional)'];
+const QPK_LABEL = ['Picker 1','Picker 2','Picker 3','Picker 4','Picker 5'];
 const qPicks = q => { const seen = new Set(); return QPK.map(k=>String(q[k]||'').trim()).filter(x=>x && !seen.has(x.toLowerCase()) && seen.add(x.toLowerCase())); };
 /* qty per picker for an uneven split: pickers 1..n-1 take what is typed, the last picker gets the rest */
 const qWant = (q, n) => {
@@ -708,7 +718,7 @@ function qRemText(q){
     : `<span style="color:var(--rose)">Each picker needs more than 0 — total ${fmt(qTotal(q))}, ${who} gets the rest (${fmt(last)})</span>`;
 }
 function qPkInput(q, i){
-  return `<input class="qpick" list="pickerList" autocomplete="off" placeholder="${QPK_LABEL[i]}" value="${esc(q[QPK[i]]||'')}" oninput="qPickInputN('${q.id}',${i},this.value)" onchange="qPickChange()" onkeydown="if(event.key==='Enter')startQueued(['${q.id}'])">`;
+  return `<input class="qpick" list="pickerList" autocomplete="off" placeholder="${QPK_LABEL[i]}" title="${i? 'Optional co-picker '+(i+1)+' (up to 5 pickers share one shipment)' : 'Picker 1'}" value="${esc(q[QPK[i]]||'')}" oninput="qPickInputN('${q.id}',${i},this.value)" onchange="qPickChange()" onkeydown="if(event.key==='Enter')startQueued(['${q.id}'])">`;
 }
 function qPickExtra(q){
   const names = qPicks(q); if (names.length < 2) return '';
