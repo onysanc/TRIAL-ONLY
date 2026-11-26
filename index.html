@@ -170,7 +170,7 @@
 <div class="wrap">
   <div class="top">
     <h1>WOPS - WAREHOUSE OPERATIONS</h1>
-    <div class="row" style="align-items:center"><button class="big csv" onclick="exportCSV()">⬇ Export CSV</button><button class="big csv" onclick="document.getElementById('imp').click()" title="Load a previous log (CSV from Export CSV, or JSON backup)">⬆ Import</button><button class="big csv" id="cloudBtn" onclick="guard(openCloud)" title="Supabase cloud sync (always on)">☁ Connecting…</button><select id="themeSel" onchange="applyTheme(this.value)" aria-label="Theme" title="Theme"><option value="belize">Belize</option><option value="deep">Belize Deep</option><option value="hcb">High Contrast Black</option><option value="hcw">High Contrast White</option></select><button class="pri big" onclick="openEntry()">＋ New entry</button></div>
+    <div class="row" style="align-items:center"><button class="big csv" onclick="guard(exportCSV)" title="Password required">🔒 ⬇ Export CSV</button><button class="big csv" onclick="guard(()=>document.getElementById('imp').click())" title="Load a previous log (CSV from Export CSV, or JSON backup)">🔒 ⬆ Import</button><button class="big csv" id="cloudBtn" onclick="guard(openCloud)" title="Supabase cloud sync (always on)">☁ Connecting…</button><select id="themeSel" onchange="applyTheme(this.value)" aria-label="Theme" title="Theme"><option value="belize">Belize</option><option value="deep">Belize Deep</option><option value="hcb">High Contrast Black</option><option value="hcw">High Contrast White</option></select><button class="pri big" onclick="openEntry()">＋ New entry</button></div>
   </div>
   <p class="note" style="margin:0">Records are saved in this browser (localStorage). Use Export to keep a copy — clearing browser data will erase the log. Use ⬆ Import to load a previous log (CSV from Export CSV, or a JSON backup).</p>
 
@@ -203,7 +203,7 @@
       <table>
         <thead><tr>
           <th><input type="checkbox" class="qchk" id="q-all" onchange="qToggleAll(this.checked)" aria-label="Select all"></th>
-          <th>Type</th><th>Shipment</th><th>Destination / Route</th><th>SO number</th><th>Truck type</th><th class="num">Qty</th><th class="num">Total</th><th>Picker</th><th></th>
+          <th>Type</th><th>Shipment</th><th>Destination / Route</th><th>SO / DR</th><th>Truck type</th><th class="num">Qty</th><th class="num">Total</th><th>Picker</th><th></th>
         </tr></thead>
         <tbody id="queue"></tbody>
       </table>
@@ -270,7 +270,7 @@
           <select id="p-sort" onchange="renderPerf()" style="width:150px">
             <option value="overall">Overall performance</option><option value="speed">Speed</option><option value="prod">Productivity</option><option value="qty">Total qty</option>
           </select></div>
-        <button class="csv" onclick="exportPerfCSV()">⬇ Export CSV</button>
+        <button class="csv" onclick="guard(exportPerfCSV)" title="Password required">🔒 ⬇ Export CSV</button>
       </div>
     </div>
     <div class="kpis" id="perf-kpis"></div>
@@ -311,21 +311,21 @@
   <div class="card pane" data-pane="log">
     <div class="chips" id="lfilt" style="margin-bottom:10px"></div>
     <div class="row" style="justify-content:flex-end;margin-bottom:10px">
-      <input id="q" placeholder="Search shipment / reference / SO / picker" oninput="renderLog()" style="width:230px">
+      <input id="q" placeholder="Search shipment / reference / SO / DR / picker" oninput="renderLog()" style="width:230px">
       <select id="filter-type" onchange="renderLog()" style="width:120px">
         <option value="">All types</option><option value="SHIPMENT">Shipment</option><option value="STO">STO</option>
       </select>
       <input type="hidden" id="filter-dest" value="">
       <div class="chips" id="dchips" style="flex-basis:100%;justify-content:flex-end"></div>
-      <button onclick="exportJSON()">⬇ Backup</button>
-      <button onclick="document.getElementById('imp').click()">⬆ Import</button>
+      <button onclick="guard(exportJSON)" title="Password required">🔒 ⬇ Backup</button>
+      <button onclick="guard(()=>document.getElementById('imp').click())">🔒 ⬆ Import</button>
       <input type="file" id="imp" accept=".csv,.json,text/csv,application/json" style="display:none" onchange="importFile(this)">
       <button class="x" onclick="askClear()">🔒 Clear all</button>
     </div>
     <div class="scroll">
       <table>
         <thead><tr>
-          <th>Logged</th><th>Type</th><th>Shipment</th><th>Destination</th><th>Reference</th><th>SO / Truck / Qty</th><th>Picker</th>
+          <th>Logged</th><th>Type</th><th>Shipment</th><th>Destination</th><th>Reference</th><th>SO / DR / Truck / Qty</th><th>Picker</th>
           <th class="num">Qty</th><th class="num">Target min</th><th class="num">Target hrs</th><th>Target end</th>
           <th>Actual end</th><th class="num">Rendered min</th><th class="num">Rendered hrs</th><th class="num">Speed %</th><th>Picking status</th><th>Validator</th><th>Start validation</th><th>End validation</th><th class="num">Validation min</th><th class="num">Validation target min</th><th class="num">Validation speed %</th><th>Validation</th><th></th>
         </tr></thead>
@@ -364,13 +364,13 @@
       </div>
       <div><label>Shipment No.</label><input id="f-ship" autocomplete="off" oninput="preview()"></div>
       <div><label>Destination / Route</label><select id="f-dest" onchange="preview()"></select></div>
-      <div><label>Reference (auto, unique)</label><input id="f-ref" readonly placeholder="Destination + Shipment No."></div>
+      <div><label>Reference (auto = SO / DR)</label><input id="f-ref" readonly placeholder="SO / DR"></div>
       <div><label>Picker</label><input id="f-picker" list="pickerList" autocomplete="off" placeholder="Name"></div>
       <div><label>Start</label><input type="datetime-local" id="f-start"></div>
     </div>
 
     <div style="margin-top:12px">
-      <label>SO number · truck type · quantity</label>
+      <label>SO / DR · truck type · quantity</label>
       <div id="lines"></div>
     </div>
 
@@ -415,7 +415,7 @@
 <dialog id="qDlg" aria-labelledby="qTitle">
   <div class="dlg-head"><h2 id="qTitle">Paste pending shipments</h2><button class="x" onclick="document.getElementById('qDlg').close()" aria-label="Close">✕</button></div>
   <div class="dlg-body">
-    <p class="note" style="margin:0 0 8px">Paste rows copied from Excel / SAP with columns in this order: <b>TYPE · SHIPMENT · DESTINATION/ROUTE · SO NUMBER · TRUCK TYPE · QTY</b>. A header row is optional. Rows with the same shipment are combined into one entry with several SO lines.</p>
+    <p class="note" style="margin:0 0 8px">Paste rows copied from Excel / SAP with columns in this order: <b>TYPE · SHIPMENT · DESTINATION/ROUTE · SO / DR · TRUCK TYPE · QTY</b>. A header row is optional. Each <b>SO / DR</b> becomes its own entry and its own unique reference — rows with the same SO / DR are combined, different SO / DR numbers are always separated (even within one shipment).</p>
     <textarea id="qText" placeholder="STO&#9;2026112401&#9;CEBU&#9;4500012345&#9;STO&#9;320&#10;SHIPMENT&#9;8012345678&#9;DAVAO&#9;1234567890&#9;10W&#9;150" oninput="qPreview()"></textarea>
     <p class="note" id="qMsg" style="min-height:16px;margin:8px 0"></p>
     <div class="row"><button class="pri" onclick="addPasted()">Add to pending</button><button onclick="document.getElementById('qDlg').close()">Cancel</button></div>
@@ -497,15 +497,23 @@ function computeTarget(lineList, start){
 }
 
 /* ---------- REFERENCE ---------- */
-function makeRef(dest, ship){
-  if (!dest || !ship) return '';
-  const base = `${dest}-${ship}`;
+const soOf = ls => { const l = (ls||[]).find(x=>String(x.so||'').trim()); return l ? String(l.so).trim() : ''; };
+/* each distinct SO number is its own entry: split a list of lines into one group per SO */
+function groupBySO(ls){
+  const m = new Map();
+  ls.forEach(l=>{ const k = String(l.so||'').trim(); if (!m.has(k)) m.set(k, []); m.get(k).push(l); });
+  return [...m.entries()].map(([so, lines])=>({so, lines}));
+}
+/* unique reference = the SO number (a -2, -3 … suffix is added only if the same SO is logged again, e.g. shared by two pickers) */
+function makeRef(dest, ship, so){
+  const base = String(so||'').trim() || (dest && ship ? `${dest}-${ship}` : '');
+  if (!base) return '';
   const used = new Set(entries.map(e=>e.ref));
   if (!used.has(base)) return base;
   let n = 2; while (used.has(`${base}-${n}`)) n++;
   return `${base}-${n}`;
 }
-function currentRef(){ return makeRef(document.getElementById('f-dest').value, document.getElementById('f-ship').value.trim()); }
+function currentRef(){ return makeRef(document.getElementById('f-dest').value, document.getElementById('f-ship').value.trim(), soOf(lines)); }
 function fillDestSelects(){
   document.getElementById('f-dest').innerHTML = '<option value="">— Select —</option>' + DESTS.map(d=>`<option>${d}</option>`).join('');
 }
@@ -532,7 +540,7 @@ function onTypeChange(){
 function renderLines(){
   document.getElementById('lines').innerHTML = lines.map((l,i)=>`
     <div class="lineRow">
-      <div><input placeholder="SO number" value="${esc(l.so)}" oninput="lines[${i}].so=this.value"></div>
+      <div><input placeholder="SO / DR" value="${esc(l.so)}" oninput="lines[${i}].so=this.value;preview()"></div>
       <div><select onchange="lines[${i}].truck=this.value;preview()">${TRUCKS.map(t=>`<option ${t===l.truck?'selected':''}>${t}</option>`).join('')}</select></div>
       <div><input type="number" min="0" step="1" placeholder="Qty" value="${l.qty||''}" oninput="lines[${i}].qty=parseFloat(this.value)||0;preview()"></div>
       
@@ -619,16 +627,18 @@ function saveEntry(){
   if (!rosterMatch(picker)) return alert(notOnRosterMsg([picker]));
   const cleanLines = lines.filter(l => l.qty > 0 || l.so.trim());
   if (!cleanLines.length || !cleanLines.some(l=>l.qty>0)) return alert('Add at least one line with a quantity.');
-  const t = computeTarget(cleanLines, start);
-  entries.unshift({
-    id: Date.now()+'-'+Math.random().toString(36).slice(2,6),
-    loggedAt: new Date().toISOString(),
-    type, shipment_no: ship, dest, ref: makeRef(dest, ship), picker,
-    lines: cleanLines.map(l=>({so:l.so.trim(), truck:l.truck, qty:l.qty})),
-    start: start.toISOString(),
-    qty: t.qty, target_min: Math.round(t.netMin*10)/10, break_min: Math.round(t.brk*10)/10,
-    final_min: Math.round(t.finalMin*10)/10, target_end: t.end.toISOString(),
-    end: null, rendered_min: null, speed_pct: null
+  groupBySO(cleanLines).forEach(g=>{
+    const t = computeTarget(g.lines, start);
+    entries.unshift({
+      id: Date.now()+'-'+Math.random().toString(36).slice(2,6),
+      loggedAt: new Date().toISOString(),
+      type, shipment_no: ship, dest, ref: makeRef(dest, ship, g.so), picker,
+      lines: g.lines.map(l=>({so:l.so.trim(), truck:l.truck, qty:l.qty})),
+      start: start.toISOString(),
+      qty: t.qty, target_min: Math.round(t.netMin*10)/10, break_min: Math.round(t.brk*10)/10,
+      final_min: Math.round(t.finalMin*10)/10, target_end: t.end.toISOString(),
+      end: null, rendered_min: null, speed_pct: null
+    });
   });
   persist(); renderLog(); resetForm(); closeEntry();
 }
@@ -768,7 +778,7 @@ function queueFromForm(){
   if (!dest) return alert('Select a destination / route.');
   const cl = lines.filter(l => l.qty > 0 || l.so.trim());
   if (!cl.some(l=>l.qty>0)) return alert('Add at least one line with a quantity.');
-  queue.push({id:qId(), type, shipment_no:ship, dest, picker, addedAt:new Date().toISOString(), lines:cl.map(l=>({so:l.so.trim(), truck:l.truck, qty:l.qty}))});
+  groupBySO(cl).forEach(g=>queue.push({id:qId(), type, shipment_no:ship, dest, picker, addedAt:new Date().toISOString(), lines:g.lines.map(l=>({so:l.so.trim(), truck:l.truck, qty:l.qty}))}));
   persist(); renderQueue(); resetForm(); closeEntry();
 }
 
@@ -790,7 +800,7 @@ function startQueued(ids){
       entries.unshift({
         id: Date.now()+'-'+Math.random().toString(36).slice(2,6),
         loggedAt: now.toISOString(),
-        type:q.type, shipment_no:q.shipment_no, dest:q.dest, ref:makeRef(q.dest, q.shipment_no), picker,
+        type:q.type, shipment_no:q.shipment_no, dest:q.dest, ref:makeRef(q.dest, q.shipment_no, soOf(pl)), picker,
         lines:pl.map(l=>({so:l.so, truck:l.truck, qty:l.qty})),
         start: now.toISOString(),
         qty:t.qty, target_min:Math.round(t.netMin*10)/10, break_min:Math.round(t.brk*10)/10,
@@ -815,7 +825,7 @@ function bulkAssign(start){
   if (start) startQueued(ids); else renderQueue();
 }
 
-/* paste from Excel / SAP: TYPE, SHIPMENT, DESTINATION/ROUTE, SO NUMBER, TRUCK TYPE, QTY */
+/* paste from Excel / SAP: TYPE, SHIPMENT, DESTINATION/ROUTE, SO / DR, TRUCK TYPE, QTY */
 function parseQueueText(text){
   const raw = text.replace(/^\ufeff/,'').split(/\r?\n/).filter(l=>l.trim());
   const split = l => (l.includes('\t') ? l.split('\t') : l.includes(';') ? l.split(';') : l.split(',')).map(c=>unq(c));
@@ -838,7 +848,7 @@ function parseQueueText(text){
     const truck = tr || (type === 'STO' ? 'STO' : '4W');
     if (!DESTS.includes(dest)) warn.add('destination ' + dest);
     if (!TRUCKS.includes(truck)) warn.add('truck ' + truck);
-    const key = type + '|' + dest + '|' + ship;
+    const key = type + '|' + dest + '|' + ship + '|' + so;
     if (!groups.has(key)) groups.set(key, {type, shipment_no:ship, dest, lines:[]});
     groups.get(key).lines.push({so, truck, qty});
   });
@@ -853,23 +863,25 @@ function qPreview(){
   const msg = document.getElementById('qMsg');
   if (!items.length && !bad){ msg.textContent = ''; return; }
   const lines_ = items.reduce((s,i)=>s+i.lines.length,0), qty = items.reduce((s,i)=>s+qTotal(i),0);
-  msg.textContent = `${items.length} shipment(s) · ${lines_} line(s) · ${fmt(qty)} qty` +
+  msg.textContent = `${items.length} SO / DR entr${items.length===1?'y':'ies'} · ${lines_} line(s) · ${fmt(qty)} qty` +
     (bad ? ` · ${bad} row(s) skipped (need shipment, destination and qty)` : '') +
     (warn.length ? ` · not in lists: ${warn.join(', ')}` : '');
 }
 function addPasted(){
   const {items, bad} = parseQueueText(document.getElementById('qText').value);
-  if (!items.length) return alert('Nothing to add. Check the column order: TYPE, SHIPMENT, DESTINATION/ROUTE, SO NUMBER, TRUCK TYPE, QTY.');
-  const have = new Set([...queue.map(q=>q.dest+'|'+q.shipment_no), ...entries.map(e=>e.dest+'|'+e.shipment_no)]);
+  if (!items.length) return alert('Nothing to add. Check the column order: TYPE, SHIPMENT, DESTINATION/ROUTE, SO / DR, TRUCK TYPE, QTY.');
+  const dk = (dest, ship, ls) => { const so = soOf(ls); return so ? 'SO|' + so : dest + '|' + ship; };
+  const have = new Set([...queue.map(q=>dk(q.dest, q.shipment_no, q.lines)), ...entries.map(e=>dk(e.dest, e.shipment_no, e.lines))]);
   let add = 0, dup = 0;
   items.forEach(i=>{
-    if (have.has(i.dest+'|'+i.shipment_no)){ dup++; return; }
-    have.add(i.dest+'|'+i.shipment_no);
+    const k = dk(i.dest, i.shipment_no, i.lines);
+    if (have.has(k)){ dup++; return; }
+    have.add(k);
     queue.push({id:qId(), type:i.type, shipment_no:i.shipment_no, dest:i.dest, picker:'', addedAt:new Date().toISOString(), lines:i.lines});
     add++;
   });
   persist(); renderQueue(); document.getElementById('qDlg').close();
-  if (dup || bad) alert(`Added ${add} to pending.` + (dup ? `\nSkipped ${dup} already in pending or in the log.` : '') + (bad ? `\nIgnored ${bad} incomplete row(s).` : ''));
+  if (dup || bad) alert(`Added ${add} to pending.` + (dup ? `\nSkipped ${dup} SO / DR number(s) already in pending or in the log.` : '') + (bad ? `\nIgnored ${bad} incomplete row(s).` : ''));
 }
 
 /* ---------- PICKER ROSTER ---------- */
@@ -1357,9 +1369,9 @@ function exportCSV(){
   if (!entries.length) return alert('Nothing to export.');
   // local date-time Excel understands (YYYY-MM-DD HH:MM) instead of raw ISO/UTC text
   const dt  = iso => iso ? toLocalInput(new Date(iso)).replace('T',' ') : '';
-  // keep long numbers (shipment / SO numbers) as text so Excel does not turn them into 2.02611E+11
+  // keep long numbers (shipment / SO / DR numbers) as text so Excel does not turn them into 2.02611E+11
   const txt = v => /^\d{6,}$/.test(String(v ?? '')) ? `="${v}"` : v;
-  const head = ['Logged At','Type','Shipment No.','Destination','Reference','SO Numbers','Truck Types','Picker','Total Qty','Start',
+  const head = ['Logged At','Type','Shipment No.','Destination','Reference','SO / DR','Truck Types','Picker','Total Qty','Start',
     'Target Min','Target Hrs','Break Min','Final Min w/ Breaks','Final Hrs w/ Breaks','Target End','Actual End',
     'Rendered Min','Rendered Hrs','Target Qty/Hr','Actual Qty/Hr','Speed %','Status',
     'Validator','Validation Start','Validation End','Validation Min','Validation Target Min','Validation Speed %','Validation Status'];
@@ -1420,7 +1432,7 @@ function csvToEntries(text){
     const ship = get(r, 'shipment no.'), picker = get(r, 'picker'), start = parseDT(get(r, 'start'));
     if (!ship || !picker || !start){ bad++; return; }
     const trucks = get(r, 'truck types').split('|').map(x => x.trim()).filter(Boolean);
-    const sos = get(r, 'so numbers').split('|').map(x => x.trim());
+    const sos = (get(r, 'so / dr') || get(r, 'so numbers')).split('|').map(x => x.trim());
     let type = get(r, 'type').toUpperCase();
     let ls = trucks.map((t, i) => { const [tr, q] = t.split(':'); return {so: sos[i] || '', truck: (tr || '').trim().toUpperCase(), qty: parseFloat(q) || 0}; });
     if (!ls.length) ls = [{so: sos[0] || '', truck: type === 'STO' ? 'STO' : '4W', qty: num(r, 'total qty') || 0}];
@@ -1436,7 +1448,7 @@ function csvToEntries(text){
     if (end && end <= start) end = null;
     const rendered = end ? (num(r, 'rendered min') ?? Math.max(0, Math.round((end - start) / 60000 - breakOverlapMinutes(start, end)))) : null;
     const speed = end && rendered > 0 ? Math.min(SPEED_CAP, num(r, 'speed %') ?? (target_min / rendered) * 100) : null;
-    const ref = get(r, 'reference') || (dest ? `${dest}-${ship}` : ship);
+    const ref = get(r, 'reference') || sos.find(Boolean) || (dest ? `${dest}-${ship}` : ship);
     let vs = end ? parseDT(get(r, 'validation start')) : null, ve = vs ? parseDT(get(r, 'validation end')) : null;
     if (ve && ve <= vs) ve = null;
     const vmin = ve ? (num(r, 'validation min') ?? Math.max(0, Math.round(((ve - vs) / 60000 - breakOverlapMinutes(vs, ve)) * 10) / 10)) : null;
