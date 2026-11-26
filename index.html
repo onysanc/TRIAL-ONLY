@@ -245,7 +245,7 @@
     <div class="row" style="margin-top:10px">
       <button onclick="resetRates()">Reset to defaults</button>
     </div>
-    <p class="note">Changes apply to new entries only — targets already logged keep the rate they were created with.</p>
+    <p class="note">Changes apply to new entries only — picking targets already logged and validations already started keep the rate they were created with.</p>
   </div>
 
   <!-- PERFORMANCE PER PICKER -->
@@ -293,6 +293,7 @@
       <div class="kpi"><span>Avg speed %</span><b style="color:var(--blue)" id="s-speed">—</b></div>
       <div class="kpi"><span>Validated</span><b style="color:var(--green)" id="s-valdone">0</b></div>
       <div class="kpi"><span>Avg validation min</span><b style="color:var(--blue)" id="s-valavg">—</b></div>
+      <div class="kpi"><span>Avg validation speed %</span><b style="color:var(--blue)" id="s-valspeed">—</b></div>
     </div>
   </div>
 
@@ -316,7 +317,7 @@
         <thead><tr>
           <th>Logged</th><th>Type</th><th>Shipment</th><th>Destination</th><th>Reference</th><th>SO / Truck / Qty</th><th>Picker</th>
           <th class="num">Qty</th><th class="num">Target min</th><th class="num">Target hrs</th><th>Target end</th>
-          <th>Actual end</th><th class="num">Rendered min</th><th class="num">Rendered hrs</th><th class="num">Speed %</th><th>Picking status</th><th>Validator</th><th>Start validation</th><th>End validation</th><th class="num">Validation min</th><th>Validation</th><th></th>
+          <th>Actual end</th><th class="num">Rendered min</th><th class="num">Rendered hrs</th><th class="num">Speed %</th><th>Picking status</th><th>Validator</th><th>Start validation</th><th>End validation</th><th class="num">Validation min</th><th class="num">Validation target min</th><th class="num">Validation speed %</th><th>Validation</th><th></th>
         </tr></thead>
         <tbody id="log"></tbody>
       </table>
@@ -425,10 +426,14 @@ let queue = load(KEY_Q, []);
 let roster = load(KEY_PICK, []);
 const DEFAULT_RATES = {AUV:180,'4W':180,'6W':110,'10W':110,'20F':110,'40':110,'40F':110,STO:480};
 const DEFAULT_MIN = 15;
+const DEFAULT_VRATES = {AUV:360,'4W':360,'6W':220,'10W':220,'20F':220,'40':220,'40F':220,STO:960};   // validation target qty/hr (adjust in the Target rates tab)
+const DEFAULT_VMIN = 10;
 const _set = load(KEY_SET, null) || {};
 let rates = Object.assign({}, DEFAULT_RATES, _set.rates || {});
 if (rates.STO === 350) rates.STO = 480;   // migrate old saved default
 let minTargetMin = _set.minMin > 0 ? _set.minMin : DEFAULT_MIN;
+let vrates = Object.assign({}, DEFAULT_VRATES, _set.vrates || {});
+let minValMin = _set.minVal > 0 ? _set.minVal : DEFAULT_VMIN;
 const DEFAULT_WORK_HRS = 6.5;
 let workHrs = _set.workHrs > 0 ? _set.workHrs : DEFAULT_WORK_HRS;
 let lines = [{so:'', truck:'4W', qty:0}];
@@ -436,7 +441,7 @@ let lines = [{so:'', truck:'4W', qty:0}];
 function load(k, d){ try { return JSON.parse(localStorage.getItem(k)) || d; } catch(e){ return d; } }
 function persist(){ saveLocal(); schedulePush(); }
 function saveLocal(){
-  try { localStorage.setItem(KEY_LOG, JSON.stringify(entries)); localStorage.setItem(KEY_BRK, JSON.stringify(breaks)); localStorage.setItem(KEY_Q, JSON.stringify(queue)); localStorage.setItem(KEY_PICK, JSON.stringify(roster)); localStorage.setItem(KEY_SET, JSON.stringify({rates, minMin:minTargetMin, workHrs})); }
+  try { localStorage.setItem(KEY_LOG, JSON.stringify(entries)); localStorage.setItem(KEY_BRK, JSON.stringify(breaks)); localStorage.setItem(KEY_Q, JSON.stringify(queue)); localStorage.setItem(KEY_PICK, JSON.stringify(roster)); localStorage.setItem(KEY_SET, JSON.stringify({rates, minMin:minTargetMin, workHrs, vrates, minVal:minValMin})); }
   catch(e){ alert('Could not save to browser storage — export your log manually.'); }
 }
 
@@ -450,6 +455,13 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 
 function rateFor(t){ const r = rates[(t||'').toUpperCase()]; return r > 0 ? r : 110; }
 
+function vrateFor(t){ const r = vrates[(t||'').toUpperCase()]; return r > 0 ? r : 220; }
+/* validation target (minutes, before breaks) = max(min validation, Σ qty ÷ validation rate) */
+function valTargetFor(lineList){
+  const raw = (lineList||[]).reduce((s,l)=>s+(l.qty||0)/vrateFor(l.truck),0)*60;
+  return Math.round(Math.max(minValMin, raw)*10)/10;
+}
+function valTargetOf(e){ return e.val_target_min != null ? e.val_target_min : valTargetFor(e.lines); }
 function breakOverlapMinutes(start, end){
   let total = 0;
   const day = `${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}`;
@@ -546,21 +558,29 @@ function resetForm(){
 /* ---------- TARGET RATE SETTINGS ---------- */
 function renderSettings(){
   document.getElementById('rate-grid').innerHTML =
+    `<h2 style="grid-column:1/-1;margin:4px 0 0">Picking target</h2>` +
     TRUCKS.map(t=>`<div><label>${t} (qty/hr)</label><input type="number" min="1" step="1" value="${rates[t]}" oninput="setRate('${t}',this.value)" onblur="this.value=rates['${t}']"></div>`).join('') +
-    `<div><label>Min target (min)</label><input type="number" min="1" step="1" value="${minTargetMin}" oninput="setMin(this.value)" onblur="this.value=minTargetMin"></div>`;
+    `<div><label>Min target (min)</label><input type="number" min="1" step="1" value="${minTargetMin}" oninput="setMin(this.value)" onblur="this.value=minTargetMin"></div>` +
+    `<h2 style="grid-column:1/-1;margin:14px 0 0">Validation target</h2>` +
+    TRUCKS.map(t=>`<div><label>${t} (qty/hr) — validation</label><input type="number" min="1" step="1" value="${vrates[t]}" oninput="setVRate('${t}',this.value)" onblur="this.value=vrates['${t}']"></div>`).join('') +
+    `<div><label>Min validation target (min)</label><input type="number" min="1" step="1" value="${minValMin}" oninput="setVMin(this.value)" onblur="this.value=minValMin"></div>`;
   refreshRateText();
 }
 function refreshRateText(){
-  const isDef = TRUCKS.every(t=>rates[t]===DEFAULT_RATES[t]) && minTargetMin===DEFAULT_MIN;
+  const isDef = TRUCKS.every(t=>rates[t]===DEFAULT_RATES[t]) && minTargetMin===DEFAULT_MIN && TRUCKS.every(t=>vrates[t]===DEFAULT_VRATES[t]) && minValMin===DEFAULT_VMIN;
   document.getElementById('r-badge').textContent = isDef ? 'defaults' : 'customized';
   document.getElementById('rate-note').textContent =
-    `Target = max(${minTargetMin} min, Σ Qty ÷ Rate). Rates per hour: ` + TRUCKS.map(t=>`${t} ${rates[t]}`).join(' · ') + '. Breaks overlapping the working period are added on top.';
+    `Target = max(${minTargetMin} min, Σ Qty ÷ Rate). Rates per hour: ` + TRUCKS.map(t=>`${t} ${rates[t]}`).join(' · ') + '. Breaks overlapping the working period are added on top.' +
+    ` Validation target = max(${minValMin} min, Σ Qty ÷ validation rate): ` + TRUCKS.map(t=>`${t} ${vrates[t]}`).join(' · ') + '. It is fixed when validation starts.';
 }
 function setRate(t, v){ const n = parseFloat(v); if (!(n > 0)) return; rates[t] = n; persist(); refreshRateText(); preview(); }
 function setMin(v){ const n = parseFloat(v); if (!(n > 0)) return; minTargetMin = n; persist(); refreshRateText(); preview(); }
+function setVRate(t, v){ const n = parseFloat(v); if (!(n > 0)) return; vrates[t] = n; persist(); refreshRateText(); renderValidation(); }
+function setVMin(v){ const n = parseFloat(v); if (!(n > 0)) return; minValMin = n; persist(); refreshRateText(); renderValidation(); }
 function resetRates(){
-  if (!confirm('Reset all rates and the minimum target to defaults?')) return;
+  if (!confirm('Reset all picking and validation rates and minimum targets to defaults?')) return;
   rates = Object.assign({}, DEFAULT_RATES); minTargetMin = DEFAULT_MIN;
+  vrates = Object.assign({}, DEFAULT_VRATES); minValMin = DEFAULT_VMIN;
   persist(); renderSettings(); preview();
 }
 
@@ -1026,7 +1046,7 @@ function startValidation(id){
   const v = rosterMatch(raw);
   if (!v) return alert(notOnRosterMsg([raw]));
   if (shipPickers(e).has(v.toLowerCase())) return alert(`${v} picked on shipment ${e.shipment_no}, so cannot validate it. Choose someone who did not pick this shipment.`);
-  e.val_by = v; e.val_start = new Date().toISOString(); e.val_end = null; e.val_min = null;
+  e.val_by = v; e.val_start = new Date().toISOString(); e.val_end = null; e.val_min = null; e.val_speed_pct = null; e.val_target_min = valTargetFor(e.lines);
   persist(); renderLog();
 }
 function endValidation(id){
@@ -1035,16 +1055,17 @@ function endValidation(id){
   const s = new Date(e.val_start), en = new Date();
   e.val_end = en.toISOString();
   e.val_min = Math.max(0, Math.round(((en-s)/60000 - breakOverlapMinutes(s, en))*10)/10);
+  e.val_speed_pct = e.val_min > 0 ? Math.min(SPEED_CAP, valTargetOf(e)/e.val_min*100) : null;
   persist(); renderLog();
 }
 function undoValidationStart(id){
   const e = entries.find(x=>x.id===id); if (!e || !e.val_start || e.val_end) return;
   if (!confirm('Cancel this validation start? The validation clock is cleared.')) return;
-  e.val_start = null; persist(); renderLog();
+  e.val_start = null; e.val_target_min = null; e.val_speed_pct = null; persist(); renderLog();
 }
 function resetValidation(id){
   const e = entries.find(x=>x.id===id); if (!e) return;
-  e.val_by = ''; e.val_start = null; e.val_end = null; e.val_min = null; persist(); renderLog();
+  e.val_by = ''; e.val_start = null; e.val_end = null; e.val_min = null; e.val_target_min = null; e.val_speed_pct = null; persist(); renderLog();
 }
 function renderValidation(){
   const now = new Date(), list = entries.filter(needsVal).sort((a,b)=>(a.val_start?0:1)-(b.val_start?0:1) || new Date(a.end)-new Date(b.end));
@@ -1058,7 +1079,8 @@ function renderValidation(){
       const s = new Date(e.val_start), m = Math.max(0, (now-s)/60000 - breakOverlapMinutes(s, now));
       return `<div class="pick" style="--c:var(--ok)">${head}
         <div class="note">Picked by ${esc(e.picker)} · ${fmt(e.qty)} qty · validator <b>${esc(e.val_by)}</b> · started ${fmtDT(e.val_start)}</div>
-        <div class="vtime" style="color:var(--ok)">${hm(m)} validating</div>
+        <div class="vtime" style="color:${m > valTargetOf(e) ? 'var(--rose)' : 'var(--ok)'}">${hm(m)} validating</div>
+        <div class="note">Target ${f1(valTargetOf(e))} min · ${m > valTargetOf(e) ? hm(m - valTargetOf(e)) + ' over target' : hm(valTargetOf(e) - m) + ' left'}</div>
         <div class="row"><button class="ok" onclick="endValidation('${e.id}')">■ END VALIDATION</button><button onclick="undoValidationStart('${e.id}')">Undo start</button></div>
       </div>`;
     }
@@ -1066,6 +1088,7 @@ function renderValidation(){
     return `<div class="pick" style="--c:${col}">${head}
       <div class="note">Picked by ${esc(e.picker)} · ${fmt(e.qty)} qty · picking ended ${fmtDT(e.end)}</div>
       <div class="vtime" style="color:var(--amber)">${hm(w)} waiting</div>
+      <div class="note">Validation target ${f1(valTargetFor(e.lines))} min</div>
       <div><label>Validator (from 👷 Pickers list)</label><select class="vin" onchange="valInput('${e.id}',this.value)"><option value="">— Select validator —</option>${roster.filter(n=>!shipPickers(e).has(n.toLowerCase())).map(n=>`<option value="${esc(n)}" ${n===e.val_by?'selected':''}>${esc(n)}</option>`).join('')}</select></div>
       <div class="row"><button class="pri" onclick="startValidation('${e.id}')">▶ START VALIDATION</button></div>
     </div>`;
@@ -1092,7 +1115,7 @@ function completeEntry(id){
 function reopenEntry(id){
   const e = entries.find(x=>x.id===id); if(!e) return;
   e.end = null; e.rendered_min = null; e.speed_pct = null;
-  e.val_by = ''; e.val_start = null; e.val_end = null; e.val_min = null;   // validation follows picking
+  e.val_by = ''; e.val_start = null; e.val_end = null; e.val_min = null; e.val_target_min = null; e.val_speed_pct = null;   // validation follows picking
   persist(); renderLog();
 }
 function delEntry(id){
@@ -1142,6 +1165,8 @@ function renderLog(){
       <td>${fmtDT(e.val_start)}</td>
       <td>${fmtDT(e.val_end)}</td>
       <td class="num">${f1(e.val_min)}</td>
+      <td class="num">${e.val_start ? f1(valTargetOf(e)) : '—'}</td>
+      <td class="num" style="${e.val_speed_pct==null?'':e.val_speed_pct>=100?'color:var(--green)':e.val_speed_pct>=80?'color:var(--amber)':'color:var(--rose)'}">${e.val_speed_pct==null?'—':e.val_speed_pct.toFixed(0)+'%'}</td>
       <td>${valTag(e)}</td>
       <td style="white-space:nowrap">
         ${done ? `<button onclick="guard(()=>reopenEntry('${e.id}'))" title="Password required">🔒 Reopen</button>` : `<button class="ok" onclick="completeEntry('${e.id}')">Finish</button>`}
@@ -1149,7 +1174,7 @@ function renderLog(){
         <button class="x" onclick="guard(()=>delEntry('${e.id}'))" title="Delete — password required">🔒 ✕</button>
       </td>
     </tr>`;
-  }).join('') : `<tr><td colspan="22" class="note" style="text-align:center;padding:20px">No records${entries.length?' match your filter':' yet'}.</td></tr>`;
+  }).join('') : `<tr><td colspan="24" class="note" style="text-align:center;padding:20px">No records${entries.length?' match your filter':' yet'}.</td></tr>`;
 
   const doneList = entries.filter(e=>e.end);
   const speeds = doneList.map(e=>e.speed_pct).filter(v=>v!=null);
@@ -1162,6 +1187,7 @@ function renderLog(){
   document.getElementById('s-speed').textContent = speeds.length ? (speeds.reduce((a,b)=>a+b,0)/speeds.length).toFixed(0)+'%' : '—';
   const valDone = entries.filter(e=>e.val_end && e.val_min!=null);
   document.getElementById('s-valdone').textContent = valDone.length;
+  { const vs = valDone.map(e=>e.val_speed_pct).filter(v=>v!=null); document.getElementById('s-valspeed').textContent = vs.length ? (vs.reduce((a,b)=>a+b,0)/vs.length).toFixed(0)+'%' : '—'; }
   document.getElementById('s-valavg').textContent = valDone.length ? f1(valDone.reduce((s,e)=>s+e.val_min,0)/valDone.length) : '—';
   renderActive(); renderValidation(); renderStrip(); renderChips(); renderPerf(); renderQueue();
   const openN = entries.length - doneList.length;
@@ -1326,7 +1352,7 @@ function exportCSV(){
   const head = ['Logged At','Type','Shipment No.','Destination','Reference','SO Numbers','Truck Types','Picker','Total Qty','Start',
     'Target Min','Target Hrs','Break Min','Final Min w/ Breaks','Final Hrs w/ Breaks','Target End','Actual End',
     'Rendered Min','Rendered Hrs','Target Qty/Hr','Actual Qty/Hr','Speed %','Status',
-    'Validator','Validation Start','Validation End','Validation Min','Validation Status'];
+    'Validator','Validation Start','Validation End','Validation Min','Validation Target Min','Validation Speed %','Validation Status'];
   const rows = entries.map(e=>[
     dt(e.loggedAt), e.type, txt(e.shipment_no), e.dest||'', e.ref||'',
     txt(e.lines.map(l=>l.so).join(' | ')), e.lines.map(l=>l.truck+':'+l.qty).join(' | '),
@@ -1336,13 +1362,13 @@ function exportCSV(){
     e.target_min > 0 ? (e.qty/(e.target_min/60)).toFixed(1) : '',
     e.rendered_min > 0 ? (e.qty/(e.rendered_min/60)).toFixed(1) : '',
     e.speed_pct==null ? '' : e.speed_pct.toFixed(1), e.end ? 'DONE' : 'OPEN',
-    e.val_by||'', dt(e.val_start), dt(e.val_end), e.val_min ?? '', valLabel(e)
+    e.val_by||'', dt(e.val_start), dt(e.val_end), e.val_min ?? '', e.val_start ? valTargetOf(e) : '', e.val_speed_pct==null ? '' : e.val_speed_pct.toFixed(1), valLabel(e)
   ]);
   const csv = [head, ...rows].map(r=>r.map(csvCell).join(',')).join('\n');
   download(`picking-target-log-${new Date().toISOString().slice(0,10)}.csv`, '\ufeff'+csv, 'text/csv');
 }
 function exportJSON(){
-  download(`picking-target-backup-${new Date().toISOString().slice(0,10)}.json`, JSON.stringify({entries, breaks, queue, roster, settings:{rates, minMin:minTargetMin, workHrs}}, null, 2), 'application/json');
+  download(`picking-target-backup-${new Date().toISOString().slice(0,10)}.json`, JSON.stringify({entries, breaks, queue, roster, settings:{rates, minMin:minTargetMin, workHrs, vrates, minVal:minValMin}}, null, 2), 'application/json');
 }
 /* ---- Import: CSV (from Export CSV) or JSON (from Backup) ---- */
 const unq = v => String(v ?? '').trim().replace(/^="(.*)"$/, '$1');   // undo Excel-text wrapper ="123456"
@@ -1411,7 +1437,9 @@ function csvToEntries(text){
       start: start.toISOString(), qty: ls.reduce((s, l) => s + l.qty, 0),
       target_min, break_min, final_min, target_end: target_end.toISOString(),
       end: end ? end.toISOString() : null, rendered_min: rendered, speed_pct: speed,
-      val_by: vs ? get(r, 'validator') : '', val_start: vs ? vs.toISOString() : null, val_end: ve ? ve.toISOString() : null, val_min: vmin
+      val_by: vs ? get(r, 'validator') : '', val_start: vs ? vs.toISOString() : null, val_end: ve ? ve.toISOString() : null, val_min: vmin,
+      val_target_min: vs ? (num(r, 'validation target min') ?? valTargetFor(ls)) : null,
+      val_speed_pct: ve && vmin > 0 ? Math.min(SPEED_CAP, num(r, 'validation speed %') ?? (num(r, 'validation target min') ?? valTargetFor(ls))/vmin*100) : null
     });
   });
   return {list, bad};
@@ -1446,6 +1474,7 @@ function importFile(input){
           if (Array.isArray(d.roster)) addRosterNames(d.roster.filter(x=>typeof x==='string'));
           if (Array.isArray(d.queue)){ const have = new Set(queue.map(q=>q.id)); d.queue.filter(q=>q && q.id && Array.isArray(q.lines) && !have.has(q.id)).forEach(q=>queue.push(q)); }
           if (d.settings && d.settings.rates){ rates = Object.assign({}, DEFAULT_RATES, d.settings.rates); if (d.settings.minMin > 0) minTargetMin = d.settings.minMin; }
+          if (d.settings && d.settings.vrates){ vrates = Object.assign({}, DEFAULT_VRATES, d.settings.vrates); if (d.settings.minVal > 0) minValMin = d.settings.minVal; }
           if (d.settings && d.settings.workHrs > 0){ workHrs = d.settings.workHrs; document.getElementById('p-work').value = workHrs; }
         }
       } else ({list, bad} = csvToEntries(text));
@@ -1472,7 +1501,7 @@ let syncBusy = false, syncAgain = false, syncPaused = false, pushTimer = null, n
 const sbOn = () => !!(sbCfg.url && sbCfg.key && sbCfg.code);
 const canon = o => JSON.stringify(o, (k, v) => (v && typeof v === 'object' && !Array.isArray(v)) ? Object.keys(v).sort().reduce((a, x) => (a[x] = v[x], a), {}) : v);
 const sig = o => { const t = canon(o); return hashStr(t) + '.' + t.length; };
-const cfgNow = () => ({roster, breaks, settings:{rates, minMin:minTargetMin, workHrs}});
+const cfgNow = () => ({roster, breaks, settings:{rates, minMin:minTargetMin, workHrs, vrates, minVal:minValMin}});
 const saveSnap = () => { try { localStorage.setItem(KEY_SNAP, JSON.stringify(snap)); } catch(e){} };
 const saveCfg = () => { try { localStorage.setItem(KEY_SB, JSON.stringify(sbCfg)); } catch(e){} };
 function schedulePush(){ if (!sbOn()) return; clearTimeout(pushTimer); pushTimer = setTimeout(()=>syncNow(), 800); }
@@ -1513,7 +1542,7 @@ function rowsDiff(list, map){
 }
 function isDefaultCfg(k, v){
   if (Array.isArray(v)) return !v.length;
-  return k === 'settings' && TRUCKS.every(t=>v.rates[t] === DEFAULT_RATES[t]) && v.minMin === DEFAULT_MIN && v.workHrs === DEFAULT_WORK_HRS;
+  return k === 'settings' && TRUCKS.every(t=>v.rates[t] === DEFAULT_RATES[t]) && v.minMin === DEFAULT_MIN && v.workHrs === DEFAULT_WORK_HRS && TRUCKS.every(t=>v.vrates[t] === DEFAULT_VRATES[t]) && v.minVal === DEFAULT_VMIN;
 }
 function cfgDiff(){
   const c = cfgNow(), out = [];
@@ -1552,6 +1581,8 @@ function applyConfig(rows){
       rates = Object.assign({}, DEFAULT_RATES, r.data.rates || {});
       if (r.data.minMin > 0) minTargetMin = r.data.minMin;
       if (r.data.workHrs > 0) workHrs = r.data.workHrs;
+      vrates = Object.assign({}, DEFAULT_VRATES, r.data.vrates || {});
+      if (r.data.minVal > 0) minValMin = r.data.minVal;
     }
     snap.config[r.key] = sig(cfgNow()[r.key]);
   });
