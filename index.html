@@ -362,7 +362,7 @@
           <option value="SHIPMENT">Shipment</option>
         </select>
       </div>
-      <div><label>Shipment No.</label><input id="f-ship" autocomplete="off" oninput="preview()"></div>
+      <div><label>Shipment No.</label><input id="f-ship" autocomplete="off" oninput="preview()" onpaste="shipPaste(event)" placeholder="Type or paste a row from Excel"></div>
       <div><label>Destination / Route</label><select id="f-dest" onchange="preview()"></select></div>
       <div><label>Reference (auto = SO / DR)</label><input id="f-ref" readonly placeholder="SO / DR"></div>
       <div><label>Picker</label><input id="f-picker" list="pickerList" autocomplete="off" placeholder="Name"></div>
@@ -532,10 +532,33 @@ function onTypeChange(){
     ship.value = st.ship; ship.readOnly = true;
     lines = [{so: st.so, truck:'STO', qty: 0}];
   } else {
-    ship.value = ''; ship.readOnly = false;
+    if (ship.readOnly) ship.value = '';   // only clear an auto-generated STO number; never overwrite what was typed/pasted
+    ship.readOnly = false;
     lines = [{so:'', truck:'4W', qty:0}];
   }
   renderLines(); preview();
+}
+function ensureDest(d){
+  const sel = document.getElementById('f-dest');
+  if (d && ![...sel.options].some(o=>o.value===d)){ const o = document.createElement('option'); o.textContent = d; sel.appendChild(o); }
+  sel.value = d || '';
+}
+/* paste a whole Excel / SAP row (TYPE, SHIPMENT, DESTINATION, SO / DR, TRUCK, QTY) into Shipment No. and the form fills itself with exactly what was provided */
+function shipPaste(ev){
+  const t = (ev.clipboardData || window.clipboardData).getData('text');
+  if (!/[\t;]/.test(t)) return;                     // a plain number pastes normally
+  const {items} = parseQueueText(t);
+  if (!items.length) return;
+  ev.preventDefault();
+  const it = items[0];
+  document.getElementById('f-type').value = it.type;
+  onTypeChange();
+  const ship = document.getElementById('f-ship');
+  if (!(it.type === 'STO' && /^sto$/i.test(it.shipment_no))) ship.value = it.shipment_no;   // keep the provided shipment number as is
+  ensureDest(it.dest);
+  lines = it.lines.map(l=>({so:l.so, truck:l.truck, qty:l.qty}));
+  renderLines(); preview();
+  if (items.length > 1) alert(`${items.length - 1} more row(s) were in the paste and were not added here.\nUse 📋 Paste from Excel in Pending ahead to load several rows at once.`);
 }
 function renderLines(){
   document.getElementById('lines').innerHTML = lines.map((l,i)=>`
@@ -831,7 +854,7 @@ function parseQueueText(text){
   const split = l => (l.includes('\t') ? l.split('\t') : l.includes(';') ? l.split(';') : l.split(',')).map(c=>unq(c));
   let rows = raw.map(split);
   const map = {type:0, ship:1, dest:2, so:3, truck:4, qty:5};
-  if (rows.length && rows[0].some(c=>/^(type|shipment|so\b|truck|qty|quantity|dest|route)/i.test(c))){
+  if (rows.length && rows[0].some(c=>/^(type|shipment|so\b|truck|qty|quantity|dest|route)/i.test(c)) && !rows[0].some(c=>/^[\d.,]+$/.test(String(c).trim()))){   // a header has no pure-number cell; a data row such as SHIPMENT 10143470 … is not a header
     const h = rows[0], find = re => h.findIndex(c=>re.test(c));
     const m = {type:find(/^type/i), ship:find(/^shipment/i), dest:find(/^(dest|route)/i), so:find(/^so\b/i), truck:find(/^truck/i), qty:find(/^(qty|quantity)/i)};
     Object.keys(m).forEach(k=>{ if (m[k] >= 0) map[k] = m[k]; });
