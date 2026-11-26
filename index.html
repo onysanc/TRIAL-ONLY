@@ -160,7 +160,7 @@
 <div class="wrap">
   <div class="top">
     <h1>WOPS - WAREHOUSE OPERATIONS</h1>
-    <div class="row" style="align-items:center"><button class="big csv" onclick="exportCSV()">⬇ Export CSV</button><button class="big csv" onclick="document.getElementById('imp').click()" title="Load a previous log (CSV from Export CSV, or JSON backup)">⬆ Import</button><button class="big csv" id="cloudBtn" onclick="guard(openCloud)" title="Supabase cloud sync">☁ Cloud off</button><select id="themeSel" onchange="applyTheme(this.value)" aria-label="Theme" title="Theme"><option value="belize">Belize</option><option value="deep">Belize Deep</option><option value="hcb">High Contrast Black</option><option value="hcw">High Contrast White</option></select><button class="pri big" onclick="openEntry()">＋ New entry</button></div>
+    <div class="row" style="align-items:center"><button class="big csv" onclick="exportCSV()">⬇ Export CSV</button><button class="big csv" onclick="document.getElementById('imp').click()" title="Load a previous log (CSV from Export CSV, or JSON backup)">⬆ Import</button><button class="big csv" id="cloudBtn" onclick="guard(openCloud)" title="Supabase cloud sync (always on)">☁ Connecting…</button><select id="themeSel" onchange="applyTheme(this.value)" aria-label="Theme" title="Theme"><option value="belize">Belize</option><option value="deep">Belize Deep</option><option value="hcb">High Contrast Black</option><option value="hcw">High Contrast White</option></select><button class="pri big" onclick="openEntry()">＋ New entry</button></div>
   </div>
   <p class="note" style="margin:0">Records are saved in this browser (localStorage). Use Export to keep a copy — clearing browser data will erase the log. Use ⬆ Import to load a previous log (CSV from Export CSV, or a JSON backup).</p>
 
@@ -183,7 +183,7 @@
       <button onclick="openEntry()">＋ Add one</button>
       <button class="x" onclick="clearQueue()">Clear queue</button>
       <div class="qbulk">
-        <div><label>Assign to selected</label><input id="q-bulk" list="pickerList" placeholder="Picker 1, Picker 2 (optional)" autocomplete="off" style="width:240px"></div>
+        <div><label>Assign to selected</label><input id="q-bulk" list="pickerList" placeholder="Up to 5 pickers, comma-separated" autocomplete="off" style="width:300px"></div>
         <button onclick="bulkAssign(false)">Assign</button>
         <button class="ok" onclick="bulkAssign(true)">▶ Assign &amp; start</button>
       </div>
@@ -198,7 +198,7 @@
         <tbody id="queue"></tbody>
       </table>
     </div>
-    <p class="note" style="margin-top:8px">Load shipments ahead of time, optionally pre-assign a picker, then tap <b>▶ Start</b> when the picker begins. For a shipment shared by two pickers, fill in the <b>2nd picker</b> and choose <b>Even split</b> or <b>Uneven split</b> (type picker 1's qty; picker 2 gets the rest) — each picker gets their own entry and clock — the clock starts at that moment with the same targets as a normal entry.</p>
+    <p class="note" style="margin-top:8px">Load shipments ahead of time, optionally pre-assign a picker, then tap <b>▶ Start</b> when the picker begins. A shipment or STO can be shared by up to <b>5 pickers</b>: fill in the extra picker boxes and choose <b>Even split</b> or <b>Uneven split</b> (type the qty for each picker except the last; the last picker gets the rest) — each picker gets their own entry and clock — the clock starts at that moment with the same targets as a normal entry.</p>
   </details>
 
   <div>
@@ -393,10 +393,10 @@
       <div><label>Access code (the one set in the SQL script)</label><input id="sb-code" type="password" autocomplete="off" onkeydown="if(event.key==='Enter')saveCloud()"></div>
     </div>
     <p class="note" id="sb-msg" style="min-height:16px;margin:8px 0"></p>
-    <div class="row"><button class="pri" onclick="saveCloud()">Save &amp; sync</button><button onclick="syncNow(true)">Sync now</button><button onclick="resyncAll()" title="Forget the sync position and download everything again (unsynced local changes are still sent)">Full re-sync</button><button class="x" onclick="disconnectCloud()">Disconnect</button></div>
-    <div class="row" style="margin-top:10px"><button class="ok" onclick="migrateLocal()" title="Send every record stored in this browser (log, pending queue, pickers, breaks, rates, settings) to the Supabase tables and verify the result">⬆ Upload ALL local data to Supabase tables</button></div>
-    <p class="note" style="margin-top:6px">Use this once per device that already holds records. It writes the log, pending queue, picker roster, break windows, target rates and settings from this browser into the cloud tables, then checks the counts.</p>
-    <p class="note" style="margin-top:10px">Once connected, every device with the same URL, key and access code shares the same log, pending queue, pickers, breaks and rates. Changes are sent a moment after you make them and other devices pick them up within ~15 seconds. If the connection drops, the app keeps working from this browser and catches up automatically.</p>
+    <div class="row"><button class="pri" onclick="saveCloud()">Save &amp; sync</button><button onclick="syncNow(true)">Sync now</button><button onclick="resyncAll()" title="Forget the sync position and download everything again (unsynced local changes are still sent)">Full re-sync</button></div>
+    <div class="row" style="margin-top:10px"><button class="ok" onclick="migrateLocal()" title="Re-send every record stored in this browser to the Supabase tables and verify the result">⬆ Re-upload ALL local data now</button></div>
+    <p class="note" style="margin-top:6px">This already runs automatically the first time a device connects; use it only to force a re-check. It writes the log, pending queue, picker roster, break windows, target rates and settings from this browser into the cloud tables, then checks the counts.</p>
+    <p class="note" style="margin-top:10px">Sync is always on: once the access code has been entered on a device, everything is uploaded automatically and kept in step. Every device with the same URL, key and access code shares the same log, pending queue, pickers, breaks and rates. Changes are sent a moment after you make them and other devices pick them up within ~15 seconds. If the connection drops, the app keeps working from this browser and catches up automatically.</p>
   </div>
 </dialog>
 
@@ -627,10 +627,7 @@ function renderQueue(){
       <td>${q.lines.map(l=>`<span class="num qsub">${esc(l.truck)}</span>`).join('')}</td>
       <td class="num">${q.lines.map(l=>`<span class="qsub">${fmt(l.qty)}</span>`).join('')}</td>
       <td class="num"><b>${fmt(qTotal(q))}</b></td>
-      <td><div class="qpk"><div class="qpk-in">
-        <input class="qpick" list="pickerList" autocomplete="off" placeholder="Picker 1" value="${esc(q.picker||'')}" oninput="qPickInput('${q.id}',this.value)" onchange="qPickChange()" onkeydown="if(event.key==='Enter')startQueued(['${q.id}'])">
-        <input class="qpick" list="pickerList" autocomplete="off" placeholder="2nd picker (optional)" value="${esc(q.picker2||'')}" oninput="qPickInput2('${q.id}',this.value)" onchange="qPickChange()" onkeydown="if(event.key==='Enter')startQueued(['${q.id}'])">
-        </div>${qPickExtra(q)}</div></td>
+      <td><div class="qpk"><div class="qpk-in">${QPK.map((k,i)=>qPkInput(q,i)).join('')}</div>${qPickExtra(q)}</div></td>
       <td style="white-space:nowrap"><button class="ok" onclick="startQueued(['${q.id}'])">▶ Start</button> <button class="x" onclick="delQueued('${q.id}')" aria-label="Remove">✕</button></td>
     </tr>`;
   }).join('') : '<tr><td colspan="10" class="note" style="text-align:center;padding:18px">Nothing queued — tap 📋 Paste from Excel to load the next shipments ahead of time.</td></tr>';
@@ -655,11 +652,18 @@ function qSplit(q, n){
   });
   return out;
 }
-const qPicks = q => { const seen = new Set(); return [q.picker, q.picker2].map(x=>String(x||'').trim()).filter(x=>x && !seen.has(x.toLowerCase()) && seen.add(x.toLowerCase())); };
-const qWant = q => { const t = qTotal(q), a = Math.min(t, Math.max(0, parseFloat(q.share1) || 0)); return [a, Math.round((t-a)*100)/100]; };
-/* uneven: picker 1 takes their qty first (SO lines in order), picker 2 gets the rest */
+const QPK = ['picker','picker2','picker3','picker4','picker5'], QMAX = 5;
+const QPK_LABEL = ['Picker 1','2nd picker (optional)','3rd picker (optional)','4th picker (optional)','5th picker (optional)'];
+const qPicks = q => { const seen = new Set(); return QPK.map(k=>String(q[k]||'').trim()).filter(x=>x && !seen.has(x.toLowerCase()) && seen.add(x.toLowerCase())); };
+/* qty per picker for an uneven split: pickers 1..n-1 take what is typed, the last picker gets the rest */
+const qWant = (q, n) => {
+  n = n || qPicks(q).length; const t = qTotal(q), sh = q.shares || [], out = []; let used = 0;
+  for (let i=0;i<n-1;i++){ const a = Math.max(0, parseFloat(sh[i]) || 0); out.push(a); used += a; }
+  out.push(Math.round((t-used)*100)/100); return out;
+};
+/* uneven: each picker takes their qty in turn (SO lines in order), the last picker gets the rest */
 function qAlloc(q, names){
-  const out = names.map(()=>[]), left = qWant(q);
+  const out = names.map(()=>[]), left = qWant(q, names.length);
   q.lines.forEach(l=>{
     let rest = l.qty;
     for (let i=0; i<names.length && rest > 0.0001; i++){
@@ -670,9 +674,21 @@ function qAlloc(q, names){
   return out;
 }
 const qParts = (q, names) => names.length > 1 && q.mode === 'custom' ? qAlloc(q, names) : qSplit(q, names.length);
+/* seed missing uneven quantities with an even split so the person only edits what they need to */
+function qSyncShares(q, n){
+  const ev = qSplit(q, n).map(p=>p.reduce((s,l)=>s+l.qty,0));
+  if (!Array.isArray(q.shares)) q.shares = (parseFloat(q.share1) > 0) ? [parseFloat(q.share1)] : [];
+  for (let i=0;i<n-1;i++) if (!(parseFloat(q.shares[i]) > 0)) q.shares[i] = ev[i];
+  q.shares = q.shares.slice(0, Math.max(0, n-1)); q.share1 = q.shares[0] ?? null;
+}
 function qRemText(q){
-  const names = qPicks(q), w = qWant(q);
-  return (w[0] > 0 && w[1] > 0) ? `<span style="color:var(--green)">→ ${esc(names[1])} gets ${fmt(w[1])}</span>` : `<span style="color:var(--rose)">Enter 1 to ${fmt(qTotal(q)-1)} (total ${fmt(qTotal(q))})</span>`;
+  const names = qPicks(q), w = qWant(q, names.length), last = w[w.length-1], who = esc(names[names.length-1]);
+  return w.every(x=>x > 0)
+    ? `<span style="color:var(--green)">→ ${who} gets ${fmt(last)}</span>`
+    : `<span style="color:var(--rose)">Each picker needs more than 0 — total ${fmt(qTotal(q))}, ${who} gets the rest (${fmt(last)})</span>`;
+}
+function qPkInput(q, i){
+  return `<input class="qpick" list="pickerList" autocomplete="off" placeholder="${QPK_LABEL[i]}" value="${esc(q[QPK[i]]||'')}" oninput="qPickInputN('${q.id}',${i},this.value)" onchange="qPickChange()" onkeydown="if(event.key==='Enter')startQueued(['${q.id}'])">`;
 }
 function qPickExtra(q){
   const names = qPicks(q); if (names.length < 2) return '';
@@ -680,9 +696,11 @@ function qPickExtra(q){
   const seg = `<div class="seg" role="group" aria-label="Split mode"><button type="button" class="${custom?'':'on'}" onclick="qSetMode('${q.id}','even')">Even</button><button type="button" class="${custom?'on':''}" onclick="qSetMode('${q.id}','custom')">Uneven</button></div>`;
   let body;
   if (custom){
-    body = `<label class="qshare"><span>${esc(names[0])} qty</span><input type="number" min="1" step="1" value="${q.share1 ?? ''}" oninput="qShare('${q.id}',this.value)" onchange="persist()"></label><span class="qrem" id="qrem-${q.id}">${qRemText(q)}</span>`;
+    qSyncShares(q, names.length);
+    body = names.slice(0,-1).map((nm,i)=>`<label class="qshare"><span>${esc(nm)} qty</span><input type="number" min="1" step="1" value="${q.shares[i] ?? ''}" oninput="qShare('${q.id}',${i},this.value)" onchange="persist()"></label>`).join('') +
+      `<span class="qrem" id="qrem-${q.id}">${qRemText(q)}</span>`;
   } else {
-    const parts = qSplit(q, 2);
+    const parts = qSplit(q, names.length);
     body = names.map((nm,i)=>`<span class="qchip">${esc(nm)} <b>${fmt(parts[i].reduce((s,l)=>s+l.qty,0))}</b></span>`).join('');
   }
   return `<div class="qsplit">${seg}<div class="qsplit-body">${body}</div></div>`;
@@ -690,17 +708,17 @@ function qPickExtra(q){
 function qSetMode(id, mode){
   const q = queue.find(x=>x.id===id); if (!q) return;
   q.mode = mode;
-  if (mode === 'custom') q.share1 = qSplit(q, 2)[0].reduce((s,l)=>s+l.qty, 0);
+  if (mode === 'custom'){ q.shares = []; qSyncShares(q, qPicks(q).length); }
   persist(); renderQueue();
 }
-function qShare(id, v){
+function qShare(id, i, v){
   const q = queue.find(x=>x.id===id); if (!q) return;
-  q.share1 = parseFloat(v) || 0;
+  if (!Array.isArray(q.shares)) q.shares = [];
+  q.shares[i] = parseFloat(v) || 0; q.share1 = q.shares[0] ?? null;
   const el = document.getElementById('qrem-'+id); if (el) el.innerHTML = qRemText(q);
 }
 function qPickChange(){ persist(); renderQueue(); }
-function qPickInput2(id, v){ const q = queue.find(x=>x.id===id); if (q) q.picker2 = v; }
-function qPickInput(id, v){ const q = queue.find(x=>x.id===id); if (q) q.picker = v; }
+function qPickInputN(id, i, v){ const q = queue.find(x=>x.id===id); if (q) q[QPK[i]] = v; }
 function qToggle(id, on){ on ? qSel.add(id) : qSel.delete(id); renderQueue(); }
 function qToggleAll(on){ queue.forEach(q=>on ? qSel.add(q.id) : qSel.delete(q.id)); renderQueue(); }
 function delQueued(id){ queue = queue.filter(q=>q.id!==id); qSel.delete(id); persist(); renderQueue(); }
@@ -734,7 +752,7 @@ function startQueued(ids){
     const bad = rawNames.filter(x=>!rosterMatch(x));
     if (bad.length){ bad.forEach(b=>{ if (!notOnList.includes(b)) notOnList.push(b); }); return; }
     const names = rawNames.map(rosterMatch);
-    if (names.length > 1 && q.mode === 'custom'){ const w = qWant(q); if (!(w[0] > 0 && w[1] > 0)){ if (!badShare) badShare = q; return; } }
+    if (names.length > 1 && q.mode === 'custom'){ qSyncShares(q, names.length); const w = qWant(q, names.length); if (!w.every(x=>x > 0)){ if (!badShare) badShare = q; return; } }
     const parts = qParts(q, names);
     names.forEach((picker, i)=>{
       const pl = parts[i]; if (!pl.length) return;
@@ -754,14 +772,14 @@ function startQueued(ids){
   });
   persist(); renderLog();
   if (notOnList.length) alert(notOnRosterMsg(notOnList));
-  if (badShare) alert(`Uneven split: enter picker 1's qty (more than 0 and less than ${fmt(qTotal(badShare))}) for ${badShare.dest} ${badShare.shipment_no}.`);
+  if (badShare) alert(`Uneven split: every picker needs a qty above 0 and the quantities must add up to ${fmt(qTotal(badShare))} (the last picker gets the rest) for ${badShare.dest} ${badShare.shipment_no}.`);
   if (firstMissing) alert(`Enter a picker name first for ${miss} item(s) (e.g. ${firstMissing.dest} ${firstMissing.shipment_no}).`);
 }
 function bulkAssign(start){
   const ids = queue.filter(q=>qSel.has(q.id)).map(q=>q.id);
   if (!ids.length) return alert('Tick the rows to assign first.');
   const picker = document.getElementById('q-bulk').value.trim();
-  if (picker){ const nm0 = qNames(picker).slice(0,2); const bad = nm0.filter(x=>!rosterMatch(x)); if (bad.length) return alert(notOnRosterMsg(bad)); const nm = nm0.map(rosterMatch); queue.forEach(q=>{ if (qSel.has(q.id)){ q.picker = nm[0] || ''; q.picker2 = nm[1] || ''; } }); }
+  if (picker){ const nm0 = qNames(picker).slice(0,QMAX); const bad = nm0.filter(x=>!rosterMatch(x)); if (bad.length) return alert(notOnRosterMsg(bad)); const nm = nm0.map(rosterMatch); queue.forEach(q=>{ if (qSel.has(q.id)){ QPK.forEach((k,i)=>{ q[k] = nm[i] || ''; }); } }); }
   else if (!start) return alert('Enter a picker name.');
   persist();
   if (start) startQueued(ids); else renderQueue();
@@ -1448,6 +1466,7 @@ const SB_DEFAULT = {url:'https://qmmoifmkqrmusvbsnivb.supabase.co', key:'sb_publ
 const KEY_SB = 'pick_sb_cfg_v1', KEY_SNAP = 'pick_sync_snap_v1', SYNC_EVERY = 15000, OVERLAP = 10000, CHUNK = 150;
 let sbCfg = Object.assign({url:SB_DEFAULT.url, key:SB_DEFAULT.key, code:''}, load(KEY_SB, null) || {});
 let snap = Object.assign({cursor:null, entries:{}, queue:{}, config:{}}, load(KEY_SNAP, null) || {});
+const KEY_MIG = 'pick_migrated_v1';
 let forceCfg = false;   // true during "Upload ALL local data": also push default-valued config
 let syncBusy = false, syncAgain = false, syncPaused = false, pushTimer = null, needRender = false, syncSt = {ok:null, msg:'', at:null};
 const sbOn = () => !!(sbCfg.url && sbCfg.key && sbCfg.code);
@@ -1467,7 +1486,7 @@ async function sbRpc(fn, args){
 }
 function renderSyncBtn(){
   const b = document.getElementById('cloudBtn'); if (!b) return;
-  if (!sbOn()){ b.textContent = '☁ Cloud off'; b.title = 'Set up Supabase cloud sync'; return; }
+  if (!sbOn()){ b.textContent = '☁ Enter access code'; b.title = 'Cloud sync needs the access code once on this device'; return; }
   const t = syncSt.at ? syncSt.at.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
   b.textContent = syncSt.ok === false ? '☁ ⚠ ' + syncSt.msg : syncSt.ok ? '☁ Synced ' + t : '☁ Syncing…';
   b.title = syncSt.msg || 'Cloud sync';
@@ -1574,7 +1593,7 @@ async function syncNow(manual){
     setSync(true);
   } catch(e){
     const m = String((e && e.message) || e);
-    if (/access denied/i.test(m)){ syncPaused = true; setSync(false, 'Wrong access code'); }
+    if (/access denied/i.test(m)){ syncPaused = true; setSync(false, 'Wrong access code'); const dl = document.getElementById('cloudDlg'); if (!dl.open) setTimeout(openCloud, 200); }
     else if (/fetch|network|load failed/i.test(m)) setSync(false, 'Offline — will retry');
     else setSync(false, m.slice(0, 70));
   } finally {
@@ -1597,17 +1616,18 @@ async function saveCloud(){
   sbCfg = {url, key, code}; saveCfg(); saveSnap(); syncPaused = false;
   msg.textContent = 'Connecting…'; renderSyncBtn();
   await syncNow(true);
+  if (syncSt.ok === true){ await autoMigrate(); if (syncSt.ok === true) document.getElementById('cloudDlg').close(); }
 }
 /* one-click migration: browser (localStorage) -> Supabase tables, then verify against the server */
-async function migrateLocal(){
+async function migrateLocal(auto){
   const msg = document.getElementById('sb-msg');
   if (!sbOn()){ msg.textContent = 'Fill in URL, key and access code and press Save & sync first.'; return; }
-  if (!confirm(`Upload everything stored in this browser to the cloud tables?\n\n${entries.length} picking(s), ${queue.length} pending, ${roster.length} picker(s), ${breaks.length} break(s) + rates/settings.\n\nRecords already in the cloud are kept; if the same record exists on both sides the cloud copy is used.`)) return;
+  if (!auto && !confirm(`Upload everything stored in this browser to the cloud tables?\n\n${entries.length} picking(s), ${queue.length} pending, ${roster.length} picker(s), ${breaks.length} break(s) + rates/settings.\n\nRecords already in the cloud are kept; if the same record exists on both sides the cloud copy is used.`)) return;
   msg.textContent = 'Uploading…';
   while (syncBusy) await new Promise(r => setTimeout(r, 300));
   snap = {cursor:null, entries:{}, queue:{}, config:{}}; saveSnap(); syncPaused = false; forceCfg = true;
   try { await syncNow(true); } finally { forceCfg = false; }
-  if (syncSt.ok !== true){ msg.textContent = 'Upload did not finish: ' + (syncSt.msg || 'unknown error') + '. Nothing is lost — fix the problem and press the button again.'; return; }
+  if (syncSt.ok !== true){ if (auto) return false; msg.textContent = 'Upload did not finish: ' + (syncSt.msg || 'unknown error') + '. Nothing is lost — fix the problem and press the button again.'; return; }
   try {
     const res = await sbRpc('wops_pick_pull', {p_code:sbCfg.code, p_since:null});
     const se = new Set((res.entries || []).map(r => r.id)), sq = new Set((res.queue || []).map(r => r.id));
@@ -1615,12 +1635,22 @@ async function migrateLocal(){
     const keys = (res.config || []).map(c => c.key);
     const missC = ['roster','breaks','settings'].filter(k => !keys.includes(k));
     const ok = !missE && !missQ && !missC.length;
+    if (ok) try { localStorage.setItem(KEY_MIG, '1'); } catch(_){}
     msg.textContent = (ok ? '✔ Verified. ' : '⚠ Check needed. ') +
       `Cloud now holds ${se.size} picking(s), ${sq.size} pending, config: ${keys.join(', ') || 'none'}. This browser: ${entries.length} picking(s), ${queue.length} pending.` +
       (missE || missQ || missC.length ? ` Missing in cloud: ${missE} picking(s), ${missQ} pending${missC.length ? ', config ' + missC.join(', ') : ''} — press the button again.` : '');
   } catch(e){
+    if (auto) return false;
     msg.textContent = 'Uploaded, but the verification read failed: ' + String((e && e.message) || e).slice(0, 80);
   }
+}
+/* always-on: first successful connection on a device uploads everything local automatically (retried until verified) */
+let autoMigBusy = false;
+async function autoMigrate(){
+  if (!sbOn() || autoMigBusy) return;
+  try { if (localStorage.getItem(KEY_MIG)) return; } catch(_){}
+  autoMigBusy = true;
+  try { await migrateLocal(true); } finally { autoMigBusy = false; }
 }
 function resyncAll(){
   if (!sbOn()) return;
@@ -1631,8 +1661,9 @@ function disconnectCloud(){
   sbCfg = {url:SB_DEFAULT.url, key:SB_DEFAULT.key, code:''}; saveCfg(); syncSt = {ok:null, msg:'', at:null}; renderSyncBtn();
   document.getElementById('sb-code').value = ''; document.getElementById('sb-msg').textContent = 'Disconnected.';
 }
-setInterval(()=>{ if (!sbOn() || document.hidden) return; if (needRender) refreshAll(); syncNow(); }, SYNC_EVERY);
-document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) syncNow(); });
+setInterval(()=>{ if (!sbOn() || document.hidden) return; if (needRender) refreshAll(); syncNow().then(autoMigrate); }, SYNC_EVERY);
+document.addEventListener('visibilitychange', ()=>{ syncNow(); });
+window.addEventListener('pagehide', ()=>{ syncNow(); });
 window.addEventListener('online', ()=>syncNow());
 
 document.getElementById('f-start').addEventListener('input', preview);
@@ -1640,7 +1671,7 @@ document.getElementById('f-start').value = toLocalInput(new Date());
 applyTheme((()=>{ try { return localStorage.getItem('pick_theme_v1'); } catch(e){ return null; } })() || 'belize');
 { const _t = (()=>{ try { return localStorage.getItem('pick_tab_v1'); } catch(e){ return null; } })(); showTab(!_t || GATED.includes(_t) ? 'log' : _t); }
 document.getElementById('p-work').value = workHrs;
-fillDestSelects(); onTypeChange(); renderRoster(); renderQueue(); renderBreaks(); renderSettings(); setPerfRange('month'); renderLog(); preview(); renderSyncBtn(); if (sbOn()) syncNow();
+fillDestSelects(); onTypeChange(); renderRoster(); renderQueue(); renderBreaks(); renderSettings(); setPerfRange('month'); renderLog(); preview(); renderSyncBtn(); if (sbOn()) syncNow().then(autoMigrate); else setTimeout(openCloud, 400);
 setInterval(()=>{ renderActive(); renderStrip(); if (!document.getElementById('valq').contains(document.activeElement)) renderValidation(); }, 30000);
 </script>
 </body>
