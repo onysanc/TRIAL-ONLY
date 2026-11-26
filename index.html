@@ -136,7 +136,7 @@
   #qText{width:100%;min-height:200px;background:var(--in);color:var(--text);border:1px solid var(--inline);border-radius:4px;padding:8px;font:12px/1.5 ui-monospace,monospace;resize:vertical}
   #qDlg{max-width:760px}
   .qpk{min-width:620px;margin:0 auto;text-align:left;display:grid;gap:4px}
-  .qpk-in{display:grid;grid-template-columns:repeat(5,minmax(118px,1fr));gap:4px}
+  .qpk-in{display:flex;gap:3px;align-items:center;flex-wrap:wrap}
   .qpk-in input{padding:4px 6px;font-size:12px;min-height:0}
   .qsplit{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .qsplit-body{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -159,9 +159,9 @@
   .scroll table td{line-height:1.25}
   .scroll table .tag{font-size:9.5px;padding:0 6px}
   .scroll table button{padding:3px 8px;font-size:11px}
-  .qpk{min-width:430px}
-  .qpk-in{grid-template-columns:repeat(5,minmax(80px,1fr));gap:3px}
-  .qpk-in input{padding:3px 5px;font-size:11px}
+  .qpk{min-width:0}
+  .qpk-in input{padding:3px 5px;font-size:11px;width:130px;flex:0 0 auto}
+  .qpk-add{padding:0 !important;width:24px;height:24px;min-height:0 !important;line-height:1;font-size:15px;font-weight:700;border-radius:50% !important;flex:0 0 auto}
   .qsub{font-size:11px}
   .scroll table td.pkcell{width:78px;max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* column chooser */
@@ -708,7 +708,7 @@ function renderQueue(){
   const tb = document.getElementById('queue');
   tb.innerHTML = queue.length ? queue.map(q=>{
     const sel = qSel.has(q.id);
-    return `<tr class="qrow ${sel?'sel':''}">
+    return `<tr class="qrow ${sel?'sel':''}" data-qid="${q.id}">
       <td><input type="checkbox" class="qchk" ${sel?'checked':''} onchange="qToggle('${q.id}',this.checked)" aria-label="Select"></td>
       <td><span class="tag ${q.type==='STO'?'sto':''}">${esc(q.type)}</span></td>
       <td class="num">${esc(q.shipment_no)}</td>
@@ -717,7 +717,7 @@ function renderQueue(){
       <td>${q.lines.map(l=>`<span class="num qsub">${esc(l.truck)}</span>`).join('')}</td>
       <td class="num">${q.lines.map(l=>`<span class="qsub">${fmt(l.qty)}</span>`).join('')}</td>
       <td class="num"><b>${fmt(qTotal(q))}</b></td>
-      <td><div class="qpk"><div class="qpk-in">${QPK.map((k,i)=>qPkInput(q,i)).join('')}</div>${qPickExtra(q)}</div></td>
+      <td><div class="qpk"><div class="qpk-in">${QPK.slice(0,qPkVisible(q)).map((k,i)=>qPkInput(q,i)).join('')}${qPkVisible(q)<QMAX ? `<button type="button" class="qpk-add" title="Add another picker (up to ${QMAX})" aria-label="Add another picker" onclick="qAddPicker('${q.id}')">+</button>` : ''}</div>${qPickExtra(q)}</div></td>
       <td style="white-space:nowrap"><button class="ok" onclick="startQueued(['${q.id}'])">▶ Start</button> <button class="x" onclick="delQueued('${q.id}')" aria-label="Remove">✕</button></td>
     </tr>`;
   }).join('') : '<tr><td colspan="10" class="note" style="text-align:center;padding:18px">Nothing queued — tap 📋 Paste from Excel to load the next shipments ahead of time.</td></tr>';
@@ -776,6 +776,19 @@ function qRemText(q){
   return w.every(x=>x > 0)
     ? `<span style="color:var(--green)">→ ${who} gets ${fmt(last)}</span>`
     : `<span style="color:var(--rose)">Each picker needs more than 0 — total ${fmt(qTotal(q))}, ${who} gets the rest (${fmt(last)})</span>`;
+}
+/* default = 1 picker box; extra boxes appear with the + button (or automatically when already filled) */
+function qPkVisible(q){
+  let last = 0; QPK.forEach((k,i)=>{ if (String(q[k]||'').trim()) last = i+1; });
+  return Math.min(QMAX, Math.max(1, last, q.pkN || 1));
+}
+function qAddPicker(id){
+  const q = queue.find(x=>x.id===id); if (!q) return;
+  q.pkN = Math.min(QMAX, qPkVisible(q) + 1);
+  persist(); renderQueue();
+  const row = document.querySelector(`[data-qid="${id}"]`);
+  const ins = row ? row.querySelectorAll('.qpick') : [];
+  if (ins.length) ins[ins.length-1].focus();
 }
 function qPkInput(q, i){
   return `<input class="qpick" list="pickerList" autocomplete="off" placeholder="${QPK_LABEL[i]}" title="${i? 'Optional co-picker '+(i+1)+' (up to 5 pickers share one shipment)' : 'Picker 1'}" value="${esc(q[QPK[i]]||'')}" oninput="qPickInputN('${q.id}',${i},this.value)" onchange="qPickChange()" onkeydown="if(event.key==='Enter')startQueued(['${q.id}'])">`;
