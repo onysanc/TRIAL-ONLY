@@ -163,6 +163,7 @@
   .qpk-in{grid-template-columns:repeat(5,minmax(80px,1fr));gap:3px}
   .qpk-in input{padding:3px 5px;font-size:11px}
   .qsub{font-size:11px}
+  .scroll table td.pkcell{width:78px;max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* column chooser */
   .colmenu{position:relative;display:inline-block}
   .colmenu>summary{cursor:pointer;list-style:none;border:1px solid var(--inline);border-radius:4px;padding:7px 12px;background:var(--btn);color:var(--acc);font-weight:600;font-size:13px;user-select:none}
@@ -1088,7 +1089,7 @@ function renderLogFilters(){
 }
 /* ---------- COLUMN CHOOSER (hide / show table columns, remembered per table) ---------- */
 const COLTABLES = [
-  {id:'logScroll',   key:'pick_hide_log_v1',   def:[1,5,10,14,18,19], mount:'colmenu-log',   side:''},
+  {id:'logScroll',   key:'pick_hide_log_v2',   def:[1,5,9,10,12,14,18,19,20,21], mount:'colmenu-log',   side:''},
   {id:'queueScroll', key:'pick_hide_queue_v1', def:[],                mount:'colmenu-queue', side:'left'},
   {id:'perfScroll',  key:'pick_hide_perf_v1',  def:[],                mount:'colmenu-perf',  side:''}
 ];
@@ -1283,7 +1284,7 @@ function renderLog(){
       <td>${destTag(e.dest)}</td>
       <td class="num" style="text-align:left">${esc(e.ref || '—')}</td>
       <td>${e.lines.map(l=>`<div class="num" style="text-align:left">${esc(l.so||'—')} · ${l.truck} · ${fmt(l.qty)}</div>`).join('')}</td>
-      <td>${esc(e.picker)}</td>
+      <td class="pkcell" title="${esc(e.picker)}">${esc(e.picker)}</td>
       <td class="num">${fmt(e.qty)}</td>
       <td class="num">${fmt(e.target_min)}</td>
       <td class="num">${fh(e.target_min)}</td>
@@ -1293,7 +1294,7 @@ function renderLog(){
       <td class="num">${e.rendered_min==null?'—':fh(e.rendered_min)}</td>
       <td class="num" style="${spCol}">${sp==null?'—':sp.toFixed(0)+'%'}</td>
       <td><span class="tag ${done?'done':'open'}">${done?'DONE':'OPEN'}</span></td>
-      <td>${esc(e.val_by||'—')}</td>
+      <td class="pkcell" title="${esc(e.val_by||'')}">${esc(e.val_by||'—')}</td>
       <td>${fmtDT(e.val_start)}</td>
       <td>${fmtDT(e.val_end)}</td>
       <td class="num">${f1(e.val_min)}</td>
