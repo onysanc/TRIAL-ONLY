@@ -1726,11 +1726,11 @@ async function pushDiff(){
   const mark = (rows, map) => rows.forEach(r=>{ if (r.deleted) delete map[r.id]; else map[r.id] = r.g; });
   for (let i = 0; i < e.length || i < q.length; i += CHUNK){
     const ce = e.slice(i, i + CHUNK), cq = q.slice(i, i + CHUNK);
-    await sbRpc('wops_pick_push', {p_code:sbCfg.code, p_entries:ce.map(strip), p_queue:cq.map(strip), p_config:[]});
+    await sbRpc('wops_pick_push_open', {p_entries:ce.map(strip), p_queue:cq.map(strip), p_config:[]});
     mark(ce, snap.entries); mark(cq, snap.queue); saveSnap();
   }
   if (c.length){
-    await sbRpc('wops_pick_push', {p_code:sbCfg.code, p_entries:[], p_queue:[], p_config:c.map(x=>({key:x.key, data:x.data}))});
+    await sbRpc('wops_pick_push_open', {p_entries:[], p_queue:[], p_config:c.map(x=>({key:x.key, data:x.data}))});
     c.forEach(x=>{ snap.config[x.key] = x.g; }); saveSnap();
   }
 }
@@ -1744,7 +1744,7 @@ async function syncNow(manual){
   try {
     const first = snap.cursor == null, ms = Date.parse(snap.cursor);
     const since = (!first && !isNaN(ms)) ? new Date(ms - OVERLAP).toISOString() : null;
-    const res = await sbRpc('wops_pick_pull', {p_code:sbCfg.code, p_since:since});
+    const res = await sbRpc('wops_pick_pull_open', {p_since:since});
     const a = applyRows(res.entries || [], entries, snap.entries, first); entries = a.list;
     if (a.changed) entries.sort((x, y)=> new Date(y.loggedAt) - new Date(x.loggedAt));
     const b = applyRows(res.queue || [], queue, snap.queue, first); queue = b.list;
@@ -1756,7 +1756,7 @@ async function syncNow(manual){
     setSync(true);
   } catch(e){
     const m = String((e && e.message) || e);
-    if (/access denied/i.test(m)) setSync(false, 'Server refused — update the Supabase functions');
+    if (/access denied|could not find the function|does not exist/i.test(m)) setSync(false, 'Run supabase_open_sync.sql in Supabase');
     else if (/fetch|network|load failed/i.test(m)) setSync(false, 'Offline — will retry');
     else setSync(false, m.slice(0, 70));
   } finally {
@@ -1776,7 +1776,7 @@ async function migrateLocal(auto){
   try { await syncNow(true); } finally { forceCfg = false; }
   if (syncSt.ok !== true){ if (auto) return false; msg.textContent = 'Upload did not finish: ' + (syncSt.msg || 'unknown error') + '. Nothing is lost — fix the problem and press the button again.'; return; }
   try {
-    const res = await sbRpc('wops_pick_pull', {p_code:sbCfg.code, p_since:null});
+    const res = await sbRpc('wops_pick_pull_open', {p_since:null});
     const se = new Set((res.entries || []).map(r => r.id)), sq = new Set((res.queue || []).map(r => r.id));
     const missE = entries.filter(e => !se.has(e.id)).length, missQ = queue.filter(q => !sq.has(q.id)).length;
     const keys = (res.config || []).map(c => c.key);
