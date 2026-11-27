@@ -206,7 +206,7 @@
 <div class="wrap">
   <div class="top">
     <h1>WOPS - WAREHOUSE OPERATIONS</h1>
-    <div class="row" style="align-items:center"><button class="big csv" onclick="guard(exportCSV)" title="Password required">🔒 ⬇ Export CSV</button><button class="big csv" onclick="guard(()=>document.getElementById('imp').click())" title="Load a previous log (CSV from Export CSV, or JSON backup)">🔒 ⬆ Import</button><button class="big csv" id="cloudBtn" onclick="guard(openCloud)" title="Supabase cloud sync (always on)">☁ Connecting…</button><select id="themeSel" onchange="applyTheme(this.value)" aria-label="Theme" title="Theme"><option value="belize">Belize</option><option value="deep">Belize Deep</option><option value="hcb">High Contrast Black</option><option value="hcw">High Contrast White</option></select><button class="pri big" onclick="openEntry()">＋ New entry</button></div>
+    <div class="row" style="align-items:center"><button class="big csv" onclick="guard(exportCSV)" title="Password required">🔒 ⬇ Export CSV</button><button class="big csv" onclick="guard(()=>document.getElementById('imp').click())" title="Load a previous log (CSV from Export CSV, or JSON backup)">🔒 ⬆ Import</button><button class="big csv" id="cloudBtn" onclick="syncNow(true)" title="Supabase cloud sync (always on)">☁ Connecting…</button><select id="themeSel" onchange="applyTheme(this.value)" aria-label="Theme" title="Theme"><option value="belize">Belize</option><option value="deep">Belize Deep</option><option value="hcb">High Contrast Black</option><option value="hcw">High Contrast White</option></select><button class="pri big" onclick="openEntry()">＋ New entry</button></div>
   </div>
   <div class="foldbar"><button onclick="foldAll(false)" title="Fold Active pickings, Validation and Pending ahead">▸ Fold all sections</button><button onclick="foldAll(true)">▾ Unfold all</button><span class="note">Folded sections still show their counts. Your choice is remembered.</span></div>
   <p class="note" style="margin:0">Records are saved in this browser (localStorage). Use Export to keep a copy — clearing browser data will erase the log. Use ⬆ Import to load a previous log (CSV from Export CSV, or a JSON backup).</p>
@@ -430,23 +430,6 @@
       <button onclick="closeEntry()">Cancel</button>
     </div>
     <p class="note" id="rate-note"></p>
-  </div>
-</dialog>
-
-<!-- CLOUD SYNC DIALOG -->
-<dialog id="cloudDlg" aria-labelledby="cloudTitle" style="width:480px;max-width:calc(100vw - 24px)">
-  <div class="dlg-head"><h2 id="cloudTitle">☁ Cloud sync (Supabase)</h2><button class="x" onclick="document.getElementById('cloudDlg').close()" aria-label="Close">✕</button></div>
-  <div class="dlg-body">
-    <div style="display:grid;gap:10px">
-      <div><label>Supabase project URL</label><input id="sb-url" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off"></div>
-      <div><label>Anon / publishable key</label><input id="sb-key" placeholder="eyJ… or sb_publishable_…" autocomplete="off"></div>
-      <div><label>Access code (the one set in the SQL script)</label><input id="sb-code" type="password" autocomplete="off" onkeydown="if(event.key==='Enter')saveCloud()"></div>
-    </div>
-    <p class="note" id="sb-msg" style="min-height:16px;margin:8px 0"></p>
-    <div class="row"><button class="pri" onclick="saveCloud()">Save &amp; sync</button><button onclick="syncNow(true)">Sync now</button><button onclick="resyncAll()" title="Forget the sync position and download everything again (unsynced local changes are still sent)">Full re-sync</button></div>
-    <div class="row" style="margin-top:10px"><button class="ok" onclick="migrateLocal()" title="Re-send every record stored in this browser to the Supabase tables and verify the result">⬆ Re-upload ALL local data now</button></div>
-    <p class="note" style="margin-top:6px">This already runs automatically the first time a device connects; use it only to force a re-check. It writes the log, pending queue, picker roster, break windows, target rates and settings from this browser into the cloud tables, then checks the counts.</p>
-    <p class="note" style="margin-top:10px">Sync is always on: once the access code has been entered on a device, everything is uploaded automatically and kept in step. Every device with the same URL, key and access code shares the same log, pending queue, pickers, breaks and rates. Changes are sent a moment after you make them and other devices pick them up within ~15 seconds. If the connection drops, the app keeps working from this browser and catches up automatically.</p>
   </div>
 </dialog>
 
@@ -1642,14 +1625,14 @@ function importFile(input){
 }
 
 /* ---------- CLOUD SYNC (Supabase RPC, access-code gated) ---------- */
-const SB_DEFAULT = {url:'https://qmmoifmkqrmusvbsnivb.supabase.co', key:'sb_publishable__Ep8wK97QO47Mgjh2RoJbw_8mqE0JHY'};   // project URL + publishable key (public by design); the access code is typed once per device
+const SB_DEFAULT = {url:'https://qmmoifmkqrmusvbsnivb.supabase.co', key:'sb_publishable__Ep8wK97QO47Mgjh2RoJbw_8mqE0JHY', code:''};   // always connected: no access code is asked for; code is only the (unused) argument the RPCs expect
 const KEY_SB = 'pick_sb_cfg_v1', KEY_SNAP = 'pick_sync_snap_v1', SYNC_EVERY = 15000, OVERLAP = 10000, CHUNK = 150;
-let sbCfg = Object.assign({url:SB_DEFAULT.url, key:SB_DEFAULT.key, code:''}, load(KEY_SB, null) || {});
+let sbCfg = Object.assign({}, SB_DEFAULT);
 let snap = Object.assign({cursor:null, entries:{}, queue:{}, config:{}}, load(KEY_SNAP, null) || {});
 const KEY_MIG = 'pick_migrated_v1';
 let forceCfg = false;   // true during "Upload ALL local data": also push default-valued config
 let syncBusy = false, syncAgain = false, syncPaused = false, pushTimer = null, needRender = false, syncSt = {ok:null, msg:'', at:null};
-const sbOn = () => !!(sbCfg.url && sbCfg.key && sbCfg.code);
+const sbOn = () => !!(sbCfg.url && sbCfg.key);
 const canon = o => JSON.stringify(o, (k, v) => (v && typeof v === 'object' && !Array.isArray(v)) ? Object.keys(v).sort().reduce((a, x) => (a[x] = v[x], a), {}) : v);
 const sig = o => { const t = canon(o); return hashStr(t) + '.' + t.length; };
 const cfgNow = () => ({roster, breaks, settings:{rates, minMin:minTargetMin, workHrs, vrates, minVal:minValMin}});
@@ -1666,15 +1649,13 @@ async function sbRpc(fn, args){
 }
 function renderSyncBtn(){
   const b = document.getElementById('cloudBtn'); if (!b) return;
-  if (!sbOn()){ b.textContent = '☁ Enter access code'; b.title = 'Cloud sync needs the access code once on this device'; return; }
-  const t = syncSt.at ? syncSt.at.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+    const t = syncSt.at ? syncSt.at.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
   b.textContent = syncSt.ok === false ? '☁ ⚠ ' + syncSt.msg : syncSt.ok ? '☁ Synced ' + t : '☁ Syncing…';
   b.title = syncSt.msg || 'Cloud sync';
 }
 function setSync(ok, msg){
   syncSt = {ok, msg: msg || '', at: ok ? new Date() : syncSt.at}; renderSyncBtn();
-  const m = document.getElementById('sb-msg'); if (m) m.textContent = ok ? 'Synced ' + syncSt.at.toLocaleTimeString() : (msg || '');
-}
+  }
 function editing(){
   const a = document.activeElement;
   return !!(a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && a.closest('#valq, #queue, .pane'));
@@ -1775,7 +1756,7 @@ async function syncNow(manual){
     setSync(true);
   } catch(e){
     const m = String((e && e.message) || e);
-    if (/access denied/i.test(m)){ syncPaused = true; setSync(false, 'Wrong access code'); const dl = document.getElementById('cloudDlg'); if (!dl.open) setTimeout(openCloud, 200); }
+    if (/access denied/i.test(m)) setSync(false, 'Server refused — update the Supabase functions');
     else if (/fetch|network|load failed/i.test(m)) setSync(false, 'Offline — will retry');
     else setSync(false, m.slice(0, 70));
   } finally {
@@ -1784,26 +1765,10 @@ async function syncNow(manual){
     if (syncAgain){ syncAgain = false; schedulePush(); }
   }
 }
-function openCloud(){
-  document.getElementById('sb-url').value = sbCfg.url || ''; document.getElementById('sb-key').value = sbCfg.key || ''; document.getElementById('sb-code').value = sbCfg.code || '';
-  document.getElementById('sb-msg').textContent = !sbOn() ? 'Not connected — records are saved in this browser only.' : (syncSt.ok ? 'Connected. Synced ' + syncSt.at.toLocaleTimeString() : (syncSt.msg || ''));
-  document.getElementById('cloudDlg').showModal();
-}
-async function saveCloud(){
-  const url = document.getElementById('sb-url').value.trim().replace(/\/+$/, ''), key = document.getElementById('sb-key').value.trim(), code = document.getElementById('sb-code').value;
-  const msg = document.getElementById('sb-msg');
-  if (!url || !key || !code){ msg.textContent = 'Fill in the URL, the key and the access code.'; return; }
-  if (!/^https:\/\/[^\/\s]+$/.test(url)){ msg.textContent = 'The URL should look like https://xxxxxxxx.supabase.co'; return; }
-  if (url !== sbCfg.url) snap = {cursor:null, entries:{}, queue:{}, config:{}};   // a different project starts from scratch
-  sbCfg = {url, key, code}; saveCfg(); saveSnap(); syncPaused = false;
-  msg.textContent = 'Connecting…'; renderSyncBtn();
-  await syncNow(true);
-  if (syncSt.ok === true){ await autoMigrate(); if (syncSt.ok === true) document.getElementById('cloudDlg').close(); }
-}
 /* one-click migration: browser (localStorage) -> Supabase tables, then verify against the server */
 async function migrateLocal(auto){
-  const msg = document.getElementById('sb-msg');
-  if (!sbOn()){ msg.textContent = 'Fill in URL, key and access code and press Save & sync first.'; return; }
+  const msg = {};
+  if (!sbOn()) return;
   if (!auto && !confirm(`Upload everything stored in this browser to the cloud tables?\n\n${entries.length} picking(s), ${queue.length} pending, ${roster.length} picker(s), ${breaks.length} break(s) + rates/settings.\n\nRecords already in the cloud are kept; if the same record exists on both sides the cloud copy is used.`)) return;
   msg.textContent = 'Uploading…';
   while (syncBusy) await new Promise(r => setTimeout(r, 300));
@@ -1834,15 +1799,6 @@ async function autoMigrate(){
   autoMigBusy = true;
   try { await migrateLocal(true); } finally { autoMigBusy = false; }
 }
-function resyncAll(){
-  if (!sbOn()) return;
-  snap = {cursor:null, entries:{}, queue:{}, config:{}}; saveSnap(); syncNow(true);
-}
-function disconnectCloud(){
-  if (!confirm('Disconnect cloud sync on this device? Records stay in this browser and stop syncing.')) return;
-  sbCfg = {url:SB_DEFAULT.url, key:SB_DEFAULT.key, code:''}; saveCfg(); syncSt = {ok:null, msg:'', at:null}; renderSyncBtn();
-  document.getElementById('sb-code').value = ''; document.getElementById('sb-msg').textContent = 'Disconnected.';
-}
 setInterval(()=>{ if (!sbOn() || document.hidden) return; if (needRender) refreshAll(); syncNow().then(autoMigrate); }, SYNC_EVERY);
 document.addEventListener('visibilitychange', ()=>{ syncNow(); });
 window.addEventListener('pagehide', ()=>{ syncNow(); });
@@ -1854,7 +1810,7 @@ document.getElementById('f-start').value = toLocalInput(new Date());
 applyTheme((()=>{ try { return localStorage.getItem('pick_theme_v1'); } catch(e){ return null; } })() || 'belize');
 { const _t = (()=>{ try { return localStorage.getItem('pick_tab_v1'); } catch(e){ return null; } })(); showTab(!_t || GATED.includes(_t) ? 'log' : _t); }
 document.getElementById('p-work').value = workHrs;
-fillDestSelects(); onTypeChange(); renderRoster(); renderQueue(); renderBreaks(); renderSettings(); setPerfRange('month'); renderLog(); preview(); renderSyncBtn(); if (sbOn()) syncNow().then(autoMigrate); else setTimeout(openCloud, 400);
+fillDestSelects(); onTypeChange(); renderRoster(); renderQueue(); renderBreaks(); renderSettings(); setPerfRange('month'); renderLog(); preview(); renderSyncBtn(); if (sbOn()) syncNow().then(autoMigrate);
 setInterval(()=>{ renderActive(); renderStrip(); if (!document.getElementById('valq').contains(document.activeElement)) renderValidation(); }, 30000);
 </script>
 </body>
